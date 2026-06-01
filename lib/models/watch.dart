@@ -1,9 +1,10 @@
 class WatchFields {
   static final List<String> values = [
-    id, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive
+    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive
   ];
 
   static const String id = 'id';
+  static const String domainId = 'domainId';
   static const String name = 'name';
   static const String url = 'url';
   static const String intervalMinutes = 'intervalMinutes';
@@ -16,6 +17,7 @@ class WatchFields {
 
 class Watch {
   final int? id;
+  final int domainId;
   final String name;
   final String url;
   final int intervalMinutes;
@@ -27,6 +29,7 @@ class Watch {
 
   const Watch({
     this.id,
+    required this.domainId,
     required this.name,
     required this.url,
     required this.intervalMinutes,
@@ -39,6 +42,7 @@ class Watch {
 
   Watch copyWith({
     int? id,
+    int? domainId,
     String? name,
     String? url,
     int? intervalMinutes,
@@ -50,6 +54,7 @@ class Watch {
   }) {
     return Watch(
       id: id ?? this.id,
+      domainId: domainId ?? this.domainId,
       name: name ?? this.name,
       url: url ?? this.url,
       intervalMinutes: intervalMinutes ?? this.intervalMinutes,
@@ -64,6 +69,7 @@ class Watch {
   Map<String, dynamic> toMap() {
     return {
       WatchFields.id: id,
+      WatchFields.domainId: domainId,
       WatchFields.name: name,
       WatchFields.url: url,
       WatchFields.intervalMinutes: intervalMinutes,
@@ -78,6 +84,7 @@ class Watch {
   static Watch fromMap(Map<String, dynamic> map) {
     return Watch(
       id: map[WatchFields.id] as int?,
+      domainId: map[WatchFields.domainId] as int,
       name: map[WatchFields.name] as String,
       url: map[WatchFields.url] as String,
       intervalMinutes: map[WatchFields.intervalMinutes] as int,
