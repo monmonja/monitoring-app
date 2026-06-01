@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../database_helper.dart';
+import '../models/domain.dart';
 import '../models/watch.dart';
+import 'add_edit_domain_screen.dart';
 import 'add_edit_watch_screen.dart';
 import 'watch_detail_screen.dart';
 
@@ -14,10 +16,14 @@ class DashboardTab extends StatefulWidget {
 
 class _DashboardTabState extends State<DashboardTab> {
   List<Watch> _watches = [];
+  List<Domain> _domains = [];
+  int? _selectedDomainId; // null means 'All Domains'
+
   int totalWatches = 0;
   int activeWatches = 0;
   int errorWatches = 0;
   bool isLoading = true;
+  bool _hasCheckedForDomains = false;
 
   @override
   void initState() {
@@ -27,7 +33,27 @@ class _DashboardTabState extends State<DashboardTab> {
 
   Future<void> _loadData() async {
     setState(() => isLoading = true);
-    final watches = await DatabaseHelper.instance.readAllWatches();
+
+    // Load domains
+    final domains = await DatabaseHelper.instance.readAllDomains();
+
+    if (!_hasCheckedForDomains && domains.isEmpty) {
+      _hasCheckedForDomains = true;
+      // Prompt user to create a domain on first load if none exist
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _promptCreateDomain();
+      });
+    } else {
+      _hasCheckedForDomains = true;
+    }
+
+    // Load watches based on selection
+    List<Watch> watches;
+    if (_selectedDomainId == null) {
+      watches = await DatabaseHelper.instance.readAllWatches();
+    } else {
+      watches = await DatabaseHelper.instance.readWatchesForDomain(_selectedDomainId!);
+    }
 
     int errors = 0;
     int active = 0;
@@ -41,6 +67,7 @@ class _DashboardTabState extends State<DashboardTab> {
     }
 
     setState(() {
+      _domains = domains;
       _watches = watches;
       totalWatches = watches.length;
       activeWatches = active;
@@ -49,10 +76,63 @@ class _DashboardTabState extends State<DashboardTab> {
     });
   }
 
+  Future<void> _promptCreateDomain() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Welcome!'),
+        content: const Text('To get started, you need to create a Domain to group your watches.'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const AddEditDomainScreen(),
+                ),
+              ).then((_) => _loadData());
+            },
+            child: const Text('Create Domain'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
+      appBar: AppBar(
+        title: _domains.isEmpty
+          ? const Text('Dashboard')
+          : DropdownButtonHideUnderline(
+              child: DropdownButton<int?>(
+                value: _selectedDomainId,
+                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                dropdownColor: Theme.of(context).primaryColor,
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('All Domains'),
+                  ),
+                  ..._domains.map((domain) {
+                    return DropdownMenuItem<int?>(
+                      value: domain.id,
+                      child: Text(domain.name),
+                    );
+                  }),
+                ],
+                onChanged: (int? newValue) {
+                  setState(() {
+                    _selectedDomainId = newValue;
+                  });
+                  _loadData();
+                },
+              ),
+            ),
+      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -87,39 +167,18 @@ class _DashboardTabState extends State<DashboardTab> {
                       child: Center(child: Text('No watches configured.')),
                     )
                   else
-                    ..._watches.map((watch) {
-                      final hasError = watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
-                      final isNeverChecked = watch.lastStatus == null;
-
-                      Color statusColor = Colors.grey;
-                      IconData statusIcon = Icons.help_outline;
-                      if (!isNeverChecked) {
-                        statusColor = hasError ? Colors.red : Colors.green;
-                        statusIcon = hasError ? Icons.error : Icons.check_circle;
-                      }
-
-                      return Card(
-                        child: ListTile(
-                          leading: Icon(statusIcon, color: statusColor, size: 36),
-                          title: Text(watch.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(watch.url, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => WatchDetailScreen(watch: watch),
-                              ),
-                            );
-                            _loadData();
-                          },
-                        ),
-                      );
-                    }),
+                    ..._buildWatchList(),
                 ],
               ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
+          if (_domains.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please create a domain first.')),
+            );
+            return;
+          }
           await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const AddEditWatchScreen(),
@@ -128,6 +187,66 @@ class _DashboardTabState extends State<DashboardTab> {
           _loadData();
         },
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  List<Widget> _buildWatchList() {
+    if (_selectedDomainId != null) {
+      // Single domain view: just list the watches
+      return _watches.map((w) => _buildWatchCard(w)).toList();
+    } else {
+      // All domains view: group watches by domain
+      final Map<int, List<Watch>> groupedWatches = {};
+      for (var watch in _watches) {
+        groupedWatches.putIfAbsent(watch.domainId, () => []).add(watch);
+      }
+
+      final List<Widget> widgets = [];
+      for (var domain in _domains) {
+        final domainWatches = groupedWatches[domain.id];
+        if (domainWatches != null && domainWatches.isNotEmpty) {
+          widgets.add(
+            Padding(
+              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0, left: 4.0),
+              child: Text(
+                domain.name,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+              ),
+            ),
+          );
+          widgets.addAll(domainWatches.map((w) => _buildWatchCard(w)));
+        }
+      }
+      return widgets;
+    }
+  }
+
+  Widget _buildWatchCard(Watch watch) {
+    final hasError = watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
+    final isNeverChecked = watch.lastStatus == null;
+
+    Color statusColor = Colors.grey;
+    IconData statusIcon = Icons.help_outline;
+    if (!isNeverChecked) {
+      statusColor = hasError ? Colors.red : Colors.green;
+      statusIcon = hasError ? Icons.error : Icons.check_circle;
+    }
+
+    return Card(
+      child: ListTile(
+        leading: Icon(statusIcon, color: statusColor, size: 36),
+        title: Text(watch.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(watch.url, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => WatchDetailScreen(watch: watch),
+            ),
+          );
+          _loadData();
+        },
       ),
     );
   }

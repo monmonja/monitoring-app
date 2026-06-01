@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/dashboard_tab.dart';
 import 'screens/settings_tab.dart';
-import 'screens/watches_tab.dart';
+import 'screens/domains_tab.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,7 +16,7 @@ class _MainScreenState extends State<MainScreen> {
 
   static const List<Widget> _widgetOptions = <Widget>[
     DashboardTab(),
-    WatchesTab(),
+    DomainsTab(),
     SettingsTab(),
   ];
 
@@ -39,8 +39,8 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.watch_later),
-            label: 'Watches',
+            icon: Icon(Icons.language),
+            label: 'Domains',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
