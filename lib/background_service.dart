@@ -45,13 +45,13 @@ void callbackDispatcher() {
           final response = await http.get(Uri.parse(watch.url));
           currentStatus = response.statusCode;
 
-          if (response.statusCode != watch.expectedStatus) {
+          if (response.statusCode < 200 || response.statusCode > 299) {
             hasError = true;
-            errorMessage = 'Status code is ${response.statusCode}, expected ${watch.expectedStatus}.';
-          } else if (watch.expectedString != null && watch.expectedString!.isNotEmpty) {
-            if (!response.body.contains(watch.expectedString!)) {
+            errorMessage = 'Status code is ${response.statusCode}, expected 200-299.';
+          } else if (watch.keyword != null && watch.keyword!.isNotEmpty) {
+            if (!response.body.contains(watch.keyword!)) {
               hasError = true;
-              errorMessage = 'Expected string not found.';
+              errorMessage = 'Keyword "${watch.keyword!}" not found.';
             }
           }
         } catch (e) {
@@ -60,9 +60,17 @@ void callbackDispatcher() {
         }
 
         // Update database with last check time and status
+        // If there was an error not related to status code (e.g. keyword or connection failed),
+        // we can set lastStatus to something outside 200-299 so the UI knows it failed.
+        // Or if status code was 200 but keyword failed, we mark lastStatus as -1 to flag it as DOWN.
+        int statusToSave = currentStatus ?? 0;
+        if (hasError && statusToSave >= 200 && statusToSave <= 299) {
+          statusToSave = -1;
+        }
+
         await dbHelper.update(watch.copyWith(
           lastCheckTime: now,
-          lastStatus: currentStatus ?? 0,
+          lastStatus: statusToSave,
         ));
 
         // Create log entry
@@ -71,7 +79,7 @@ void callbackDispatcher() {
             watchId: watch.id!,
             timestamp: now,
             status: !hasError,
-            statusCode: currentStatus,
+            statusCode: currentStatus, // Keep real status code in logs
             errorMessage: errorMessage.isNotEmpty ? errorMessage : null,
           ));
         }

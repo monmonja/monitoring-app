@@ -16,8 +16,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
   late String _name;
   late String _url;
   late int _intervalMinutes;
-  late int _expectedStatus;
-  String? _expectedString;
+  String? _keyword;
 
   @override
   void initState() {
@@ -25,8 +24,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
     _name = widget.watch?.name ?? '';
     _url = widget.watch?.url ?? 'https://';
     _intervalMinutes = widget.watch?.intervalMinutes ?? 15;
-    _expectedStatus = widget.watch?.expectedStatus ?? 200;
-    _expectedString = widget.watch?.expectedString;
+    _keyword = widget.watch?.keyword;
   }
 
   Future<void> _saveForm() async {
@@ -40,8 +38,8 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
       name: _name,
       url: _url,
       intervalMinutes: _intervalMinutes,
-      expectedStatus: _expectedStatus,
-      expectedString: _expectedString?.isEmpty == true ? null : _expectedString,
+      expectedStatus: 200, // Legacy field, kept for DB compatibility, but always 200
+      keyword: _keyword?.isEmpty == true ? null : _keyword,
       lastStatus: widget.watch?.lastStatus,
       lastCheckTime: widget.watch?.lastCheckTime,
       isActive: widget.watch?.isActive ?? true,
@@ -114,22 +112,9 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                initialValue: _expectedStatus.toString(),
-                decoration: const InputDecoration(labelText: 'Expected Status Code'),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || int.tryParse(value) == null) {
-                    return 'Please enter a valid status code (e.g., 200)';
-                  }
-                  return null;
-                },
-                onSaved: (value) => _expectedStatus = int.parse(value!),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                initialValue: _expectedString,
+                initialValue: _keyword,
                 decoration: const InputDecoration(labelText: 'Expected String in Body (Optional)'),
-                onSaved: (value) => _expectedString = value,
+                onSaved: (value) => _keyword = value,
               ),
               const SizedBox(height: 32),
               ElevatedButton(

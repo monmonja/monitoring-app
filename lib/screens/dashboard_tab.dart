@@ -34,7 +34,7 @@ class _DashboardTabState extends State<DashboardTab> {
     for (var watch in watches) {
       if (watch.isActive) {
         active++;
-        if (watch.lastStatus != null && watch.lastStatus != watch.expectedStatus) {
+        if (watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300)) {
           errors++;
         }
       }
@@ -88,7 +88,7 @@ class _DashboardTabState extends State<DashboardTab> {
                     )
                   else
                     ..._watches.map((watch) {
-                      final hasError = watch.lastStatus != null && watch.lastStatus != watch.expectedStatus;
+                      final hasError = watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
                       final isNeverChecked = watch.lastStatus == null;
 
                       Color statusColor = Colors.grey;
