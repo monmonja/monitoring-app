@@ -80,14 +80,16 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
                 children: [
                   _buildDetailRow('URL', _currentWatch.url),
                   _buildDetailRow('Interval', '${_currentWatch.intervalMinutes} minutes'),
-                  _buildDetailRow('Expected Status', _currentWatch.expectedStatus.toString()),
-                  _buildDetailRow('Expected String', _currentWatch.expectedString ?? 'None'),
+                  _buildDetailRow('Expected Status', '200-299'),
+                  _buildDetailRow('Keyword (Optional)', _currentWatch.keyword ?? 'None'),
                   _buildDetailRow(
                       'Last Status',
-                      _currentWatch.lastStatus?.toString() ?? 'Never checked',
+                      _currentWatch.lastStatus == null
+                          ? 'Never checked'
+                          : (_currentWatch.lastStatus == -1 ? 'Keyword Failed (-1)' : _currentWatch.lastStatus.toString()),
                       color: _currentWatch.lastStatus == null
                           ? Colors.grey
-                          : (_currentWatch.lastStatus == _currentWatch.expectedStatus ? Colors.green : Colors.red)),
+                          : ((_currentWatch.lastStatus! >= 200 && _currentWatch.lastStatus! < 300) ? Colors.green : Colors.red)),
                   _buildDetailRow(
                       'Last Checked',
                       _currentWatch.lastCheckTime != null

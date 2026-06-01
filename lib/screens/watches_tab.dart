@@ -56,7 +56,7 @@ class _WatchesTabState extends State<WatchesTab> {
             itemBuilder: (context, index) {
               final watch = watches[index];
               final hasError = watch.lastStatus != null &&
-                  watch.lastStatus != watch.expectedStatus;
+                  (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
 
               return ListTile(
                 title: Text(watch.name),

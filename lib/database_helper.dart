@@ -24,7 +24,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 2, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 3, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -42,7 +42,7 @@ CREATE TABLE watches (
   url $textType,
   intervalMinutes $integerType,
   expectedStatus $integerType,
-  expectedString $textNullableType,
+  keyword $textNullableType,
   lastStatus $integerType,
   lastCheckTime $textType,
   isActive $boolType
@@ -82,6 +82,21 @@ CREATE TABLE watch_logs (
   FOREIGN KEY (watchId) REFERENCES watches (id) ON DELETE CASCADE
 )
 ''');
+    }
+    if (oldVersion < 3) {
+      // Handle the rename of expectedString to keyword.
+      // SQLite doesn't directly support RENAME COLUMN in all versions commonly used,
+      // but newer versions do. Let's just add the column if it doesn't exist.
+      // Since we just changed expectedString to keyword in the create statement,
+      // let's alter table.
+      try {
+        await db.execute('ALTER TABLE watches RENAME COLUMN expectedString TO keyword');
+      } catch (e) {
+        // If rename fails (older sqlite), add column
+        await db.execute('ALTER TABLE watches ADD COLUMN keyword TEXT');
+        // Migrate data
+        await db.execute('UPDATE watches SET keyword = expectedString');
+      }
     }
   }
 

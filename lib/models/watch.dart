@@ -1,6 +1,6 @@
 class WatchFields {
   static final List<String> values = [
-    id, name, url, intervalMinutes, expectedStatus, expectedString, lastStatus, lastCheckTime, isActive
+    id, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive
   ];
 
   static const String id = 'id';
@@ -8,7 +8,7 @@ class WatchFields {
   static const String url = 'url';
   static const String intervalMinutes = 'intervalMinutes';
   static const String expectedStatus = 'expectedStatus';
-  static const String expectedString = 'expectedString';
+  static const String keyword = 'keyword';
   static const String lastStatus = 'lastStatus';
   static const String lastCheckTime = 'lastCheckTime';
   static const String isActive = 'isActive';
@@ -20,7 +20,7 @@ class Watch {
   final String url;
   final int intervalMinutes;
   final int expectedStatus;
-  final String? expectedString;
+  final String? keyword;
   final int? lastStatus;
   final DateTime? lastCheckTime;
   final bool isActive;
@@ -31,7 +31,7 @@ class Watch {
     required this.url,
     required this.intervalMinutes,
     required this.expectedStatus,
-    this.expectedString,
+    this.keyword,
     this.lastStatus,
     this.lastCheckTime,
     this.isActive = true,
@@ -43,7 +43,7 @@ class Watch {
     String? url,
     int? intervalMinutes,
     int? expectedStatus,
-    String? expectedString,
+    String? keyword,
     int? lastStatus,
     DateTime? lastCheckTime,
     bool? isActive,
@@ -54,7 +54,7 @@ class Watch {
       url: url ?? this.url,
       intervalMinutes: intervalMinutes ?? this.intervalMinutes,
       expectedStatus: expectedStatus ?? this.expectedStatus,
-      expectedString: expectedString ?? this.expectedString,
+      keyword: keyword ?? this.keyword,
       lastStatus: lastStatus ?? this.lastStatus,
       lastCheckTime: lastCheckTime ?? this.lastCheckTime,
       isActive: isActive ?? this.isActive,
@@ -68,7 +68,7 @@ class Watch {
       WatchFields.url: url,
       WatchFields.intervalMinutes: intervalMinutes,
       WatchFields.expectedStatus: expectedStatus,
-      WatchFields.expectedString: expectedString,
+      WatchFields.keyword: keyword,
       WatchFields.lastStatus: lastStatus,
       WatchFields.lastCheckTime: lastCheckTime?.toIso8601String(),
       WatchFields.isActive: isActive ? 1 : 0,
@@ -82,7 +82,7 @@ class Watch {
       url: map[WatchFields.url] as String,
       intervalMinutes: map[WatchFields.intervalMinutes] as int,
       expectedStatus: map[WatchFields.expectedStatus] as int,
-      expectedString: map[WatchFields.expectedString] as String?,
+      keyword: map[WatchFields.keyword] as String?,
       lastStatus: map[WatchFields.lastStatus] as int?,
       lastCheckTime: map[WatchFields.lastCheckTime] != null
           ? DateTime.parse(map[WatchFields.lastCheckTime] as String)
