@@ -1,11 +1,12 @@
 import 'dart:convert';
-import 'dart:io';
+
 
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
+
 
 import 'models/watch.dart';
+import 'models/watch_log.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -23,7 +24,7 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return await openDatabase(path, version: 1, onCreate: _createDB);
+    return await openDatabase(path, version: 2, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -31,6 +32,7 @@ class DatabaseHelper {
     const textType = 'TEXT NOT NULL';
     const textNullableType = 'TEXT';
     const integerType = 'INTEGER NOT NULL';
+    const integerNullableType = 'INTEGER';
     const boolType = 'BOOLEAN NOT NULL';
 
     await db.execute('''
@@ -46,6 +48,41 @@ CREATE TABLE watches (
   isActive $boolType
 )
 ''');
+
+    await db.execute('''
+CREATE TABLE watch_logs (
+  id $idType,
+  watchId $integerType,
+  timestamp $textType,
+  status $boolType,
+  statusCode $integerNullableType,
+  errorMessage $textNullableType,
+  FOREIGN KEY (watchId) REFERENCES watches (id) ON DELETE CASCADE
+)
+''');
+  }
+
+  Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
+      const textType = 'TEXT NOT NULL';
+      const textNullableType = 'TEXT';
+      const integerType = 'INTEGER NOT NULL';
+      const integerNullableType = 'INTEGER';
+      const boolType = 'BOOLEAN NOT NULL';
+
+      await db.execute('''
+CREATE TABLE watch_logs (
+  id $idType,
+  watchId $integerType,
+  timestamp $textType,
+  status $boolType,
+  statusCode $integerNullableType,
+  errorMessage $textNullableType,
+  FOREIGN KEY (watchId) REFERENCES watches (id) ON DELETE CASCADE
+)
+''');
+    }
   }
 
   Future<Watch> create(Watch watch) async {
@@ -89,6 +126,11 @@ CREATE TABLE watches (
 
   Future<int> delete(int id) async {
     final db = await instance.database;
+    await db.delete(
+      'watch_logs',
+      where: 'watchId = ?',
+      whereArgs: [id],
+    );
     return await db.delete(
       'watches',
       where: 'id = ?',
@@ -98,6 +140,7 @@ CREATE TABLE watches (
 
   Future<int> deleteAll() async {
     final db = await instance.database;
+    await db.delete('watch_logs');
     return await db.delete('watches');
   }
 
@@ -121,6 +164,33 @@ CREATE TABLE watches (
     });
   }
 
+
+  Future<WatchLog> createWatchLog(WatchLog log) async {
+    final db = await instance.database;
+    final id = await db.insert('watch_logs', log.toMap());
+    return log.copyWith(id: id);
+  }
+
+  Future<List<WatchLog>> readWatchLogs(int watchId) async {
+    final db = await instance.database;
+    const orderBy = 'timestamp ASC';
+    final result = await db.query(
+      'watch_logs',
+      where: 'watchId = ?',
+      whereArgs: [watchId],
+      orderBy: orderBy,
+    );
+    return result.map((json) => WatchLog.fromMap(json)).toList();
+  }
+
+  Future<int> deleteOldWatchLogs(DateTime before) async {
+    final db = await instance.database;
+    return await db.delete(
+      'watch_logs',
+      where: 'timestamp < ?',
+      whereArgs: [before.toIso8601String()],
+    );
+  }
   Future close() async {
     final db = await instance.database;
     db.close();

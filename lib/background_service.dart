@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 
 import 'database_helper.dart';
-import 'models/watch.dart';
+
+import 'models/watch_log.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -63,6 +64,21 @@ void callbackDispatcher() {
           lastCheckTime: now,
           lastStatus: currentStatus ?? 0,
         ));
+
+        // Create log entry
+        if (watch.id != null) {
+          await dbHelper.createWatchLog(WatchLog(
+            watchId: watch.id!,
+            timestamp: now,
+            status: !hasError,
+            statusCode: currentStatus,
+            errorMessage: errorMessage.isNotEmpty ? errorMessage : null,
+          ));
+        }
+
+        // Clean up old logs (older than 31 days)
+        final thirtyOneDaysAgo = now.subtract(const Duration(days: 31));
+        await dbHelper.deleteOldWatchLogs(thirtyOneDaysAgo);
 
         if (hasError) {
           // Show notification
