@@ -25,11 +25,11 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    // Bumping version to 4 for domain addition
+    // Bumping version to 5 for new tracking fields
     // To simplify for dev, we can just drop tables and recreate, or implement the upgrade.
     // Given the previous instruction "no db migration, havent build the app yet",
     // we can safely just adjust _createDB. But to be safe if someone ran it, we'll implement _upgradeDB.
-    return await openDatabase(path, version: 4, onCreate: _createDB, onUpgrade: _upgradeDB);
+    return await openDatabase(path, version: 5, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -60,6 +60,10 @@ CREATE TABLE watches (
   lastStatus $integerType,
   lastCheckTime $textType,
   isActive $boolType,
+  consecutiveFails INTEGER NOT NULL DEFAULT 0,
+  latencyThreshold INTEGER,
+  alertOnSslExpiry BOOLEAN NOT NULL DEFAULT 0,
+  checkKeywordAbsence BOOLEAN NOT NULL DEFAULT 0,
   FOREIGN KEY (domainId) REFERENCES domains (id) ON DELETE CASCADE
 )
 ''');
@@ -72,6 +76,7 @@ CREATE TABLE watch_logs (
   status $boolType,
   statusCode $integerNullableType,
   errorMessage $textNullableType,
+  responseTimeMs $integerNullableType,
   FOREIGN KEY (watchId) REFERENCES watches (id) ON DELETE CASCADE
 )
 ''');
@@ -132,6 +137,14 @@ CREATE TABLE domains (
       });
 
       await db.execute('ALTER TABLE watches ADD COLUMN domainId INTEGER DEFAULT $defaultDomainId');
+    }
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE watches ADD COLUMN consecutiveFails INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE watches ADD COLUMN latencyThreshold INTEGER');
+      await db.execute('ALTER TABLE watches ADD COLUMN alertOnSslExpiry BOOLEAN NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE watches ADD COLUMN checkKeywordAbsence BOOLEAN NOT NULL DEFAULT 0');
+
+      await db.execute('ALTER TABLE watch_logs ADD COLUMN responseTimeMs INTEGER');
     }
   }
 
@@ -302,11 +315,15 @@ CREATE TABLE domains (
 
   Future<int> deleteOldWatchLogs(DateTime before) async {
     final db = await instance.database;
-    return await db.delete(
+    final count = await db.delete(
       'watch_logs',
       where: 'timestamp < ?',
       whereArgs: [before.toIso8601String()],
     );
+    if (count > 0) {
+      await db.execute('VACUUM');
+    }
+    return count;
   }
   Future close() async {
     final db = await instance.database;

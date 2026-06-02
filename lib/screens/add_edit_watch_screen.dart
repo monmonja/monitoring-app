@@ -22,6 +22,10 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
   List<Domain> _domains = [];
   bool _isLoadingDomains = true;
 
+  bool _checkKeywordAbsence = false;
+  bool _alertOnSslExpiry = false;
+  String? _latencyThreshold;
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +34,9 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
     _intervalMinutes = widget.watch?.intervalMinutes ?? 15;
     _keyword = widget.watch?.keyword;
     _selectedDomainId = widget.watch?.domainId;
+    _checkKeywordAbsence = widget.watch?.checkKeywordAbsence ?? false;
+    _alertOnSslExpiry = widget.watch?.alertOnSslExpiry ?? false;
+    _latencyThreshold = widget.watch?.latencyThreshold?.toString();
     _loadDomains();
   }
 
@@ -68,6 +75,10 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
       lastStatus: widget.watch?.lastStatus,
       lastCheckTime: widget.watch?.lastCheckTime,
       isActive: widget.watch?.isActive ?? true,
+      checkKeywordAbsence: _checkKeywordAbsence,
+      alertOnSslExpiry: _alertOnSslExpiry,
+      latencyThreshold: _latencyThreshold != null && _latencyThreshold!.isNotEmpty ? int.tryParse(_latencyThreshold!) : null,
+      consecutiveFails: widget.watch?.consecutiveFails ?? 0,
     );
 
     if (widget.watch == null) {
@@ -171,8 +182,39 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: _keyword,
-                decoration: const InputDecoration(labelText: 'Expected String in Body (Optional)'),
+                decoration: const InputDecoration(labelText: 'Keyword to search in Body (Optional)'),
                 onSaved: (value) => _keyword = value,
+              ),
+              SwitchListTile(
+                title: const Text('Alert if Keyword is FOUND'),
+                subtitle: const Text('By default, we alert if the keyword is MISSING.'),
+                value: _checkKeywordAbsence,
+                onChanged: (val) {
+                  setState(() => _checkKeywordAbsence = val);
+                },
+              ),
+              const Divider(),
+              const Text('Advanced Settings', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              TextFormField(
+                initialValue: _latencyThreshold,
+                decoration: const InputDecoration(labelText: 'Latency Alert Threshold (ms) (Optional)'),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value != null && value.isNotEmpty && int.tryParse(value) == null) {
+                    return 'Please enter a valid number';
+                  }
+                  return null;
+                },
+                onSaved: (value) => _latencyThreshold = value,
+              ),
+              SwitchListTile(
+                title: const Text('Alert on SSL Expiry'),
+                subtitle: const Text('Alert if SSL cert expires in < 14 days'),
+                value: _alertOnSslExpiry,
+                onChanged: (val) {
+                  setState(() => _alertOnSslExpiry = val);
+                },
               ),
                         const SizedBox(height: 32),
                         ElevatedButton(

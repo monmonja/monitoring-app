@@ -1,6 +1,6 @@
 class WatchLogFields {
   static final List<String> values = [
-    id, watchId, timestamp, status, statusCode, errorMessage
+    id, watchId, timestamp, status, statusCode, errorMessage, responseTimeMs
   ];
 
   static const String id = 'id';
@@ -9,6 +9,7 @@ class WatchLogFields {
   static const String status = 'status';
   static const String statusCode = 'statusCode';
   static const String errorMessage = 'errorMessage';
+  static const String responseTimeMs = 'responseTimeMs';
 }
 
 class WatchLog {
@@ -18,6 +19,7 @@ class WatchLog {
   final bool status; // true for success (alive), false for failure (dead)
   final int? statusCode;
   final String? errorMessage;
+  final int? responseTimeMs;
 
   const WatchLog({
     this.id,
@@ -26,6 +28,7 @@ class WatchLog {
     required this.status,
     this.statusCode,
     this.errorMessage,
+    this.responseTimeMs,
   });
 
   WatchLog copyWith({
@@ -35,6 +38,7 @@ class WatchLog {
     bool? status,
     int? statusCode,
     String? errorMessage,
+    int? responseTimeMs,
   }) {
     return WatchLog(
       id: id ?? this.id,
@@ -43,6 +47,7 @@ class WatchLog {
       status: status ?? this.status,
       statusCode: statusCode ?? this.statusCode,
       errorMessage: errorMessage ?? this.errorMessage,
+      responseTimeMs: responseTimeMs ?? this.responseTimeMs,
     );
   }
 
@@ -54,6 +59,7 @@ class WatchLog {
       WatchLogFields.status: status ? 1 : 0,
       WatchLogFields.statusCode: statusCode,
       WatchLogFields.errorMessage: errorMessage,
+      WatchLogFields.responseTimeMs: responseTimeMs,
     };
   }
 
@@ -65,6 +71,7 @@ class WatchLog {
       status: map[WatchLogFields.status] == 1,
       statusCode: map[WatchLogFields.statusCode] as int?,
       errorMessage: map[WatchLogFields.errorMessage] as String?,
+      responseTimeMs: map[WatchLogFields.responseTimeMs] as int?,
     );
   }
 }
