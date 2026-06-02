@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../database_helper.dart';
 import '../models/domain.dart';
@@ -100,6 +101,31 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
+  Future<void> _shareStatus() async {
+    if (_watches.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No watches to share.')),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('Uptime Status Report');
+    buffer.writeln('--------------------');
+    buffer.writeln('Total: $totalWatches | Active: $activeWatches | Errors: $errorWatches\n');
+
+    for (var watch in _watches) {
+      if (!watch.isActive) continue;
+
+      final hasError = watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
+      final statusString = watch.lastStatus == null ? 'Pending' : (hasError ? 'DOWN' : 'UP');
+      buffer.writeln('- ${watch.name} ($statusString)');
+      buffer.writeln('  URL: ${watch.url}');
+    }
+
+    await Share.share(buffer.toString(), subject: 'System Uptime Status Report');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,6 +158,13 @@ class _DashboardTabState extends State<DashboardTab> {
                 },
               ),
             ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Share Status',
+            onPressed: _shareStatus,
+          ),
+        ],
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())

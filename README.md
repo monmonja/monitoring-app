@@ -1,17 +1,14 @@
-# app
+# Website Uptime Monitor
 
-A new Flutter project.
+A robust, pure-mobile Flutter application designed to help users monitor their websites by scheduling periodic background checks.
 
-## Getting Started
+## Advanced Features
+This application is fully featured and entirely localized to the device (no external backend servers).
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+*   **Reliable Background Checks:** Uses `flutter_background_service` to run scheduled jobs.
+*   **Latency & SSL Monitoring:** Tracks response times and alerts on impending SSL certificate expirations.
+*   **Advanced Assertions:** Asserts HTTP status codes and allows asserting the *presence* or *absence* of specific keywords.
+*   **Anti-Spam & Retries:** Requires 3 consecutive check failures before triggering an alert, and groups notifications to prevent alert fatigue.
+*   **Data Visualization:** Uses `fl_chart` to render historical latency logs.
+*   **Home Widget:** Includes an Android Home Screen Widget to view system status at a glance.
+*   **Status Sharing:** Easily share your current uptime status to messaging apps using `share_plus`.

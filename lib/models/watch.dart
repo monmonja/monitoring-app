@@ -1,6 +1,6 @@
 class WatchFields {
   static final List<String> values = [
-    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive
+    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence
   ];
 
   static const String id = 'id';
@@ -13,6 +13,10 @@ class WatchFields {
   static const String lastStatus = 'lastStatus';
   static const String lastCheckTime = 'lastCheckTime';
   static const String isActive = 'isActive';
+  static const String consecutiveFails = 'consecutiveFails';
+  static const String latencyThreshold = 'latencyThreshold';
+  static const String alertOnSslExpiry = 'alertOnSslExpiry';
+  static const String checkKeywordAbsence = 'checkKeywordAbsence';
 }
 
 class Watch {
@@ -26,6 +30,10 @@ class Watch {
   final int? lastStatus;
   final DateTime? lastCheckTime;
   final bool isActive;
+  final int consecutiveFails;
+  final int? latencyThreshold;
+  final bool alertOnSslExpiry;
+  final bool checkKeywordAbsence;
 
   const Watch({
     this.id,
@@ -38,6 +46,10 @@ class Watch {
     this.lastStatus,
     this.lastCheckTime,
     this.isActive = true,
+    this.consecutiveFails = 0,
+    this.latencyThreshold,
+    this.alertOnSslExpiry = false,
+    this.checkKeywordAbsence = false,
   });
 
   Watch copyWith({
@@ -51,6 +63,10 @@ class Watch {
     int? lastStatus,
     DateTime? lastCheckTime,
     bool? isActive,
+    int? consecutiveFails,
+    int? latencyThreshold,
+    bool? alertOnSslExpiry,
+    bool? checkKeywordAbsence,
   }) {
     return Watch(
       id: id ?? this.id,
@@ -63,6 +79,10 @@ class Watch {
       lastStatus: lastStatus ?? this.lastStatus,
       lastCheckTime: lastCheckTime ?? this.lastCheckTime,
       isActive: isActive ?? this.isActive,
+      consecutiveFails: consecutiveFails ?? this.consecutiveFails,
+      latencyThreshold: latencyThreshold ?? this.latencyThreshold,
+      alertOnSslExpiry: alertOnSslExpiry ?? this.alertOnSslExpiry,
+      checkKeywordAbsence: checkKeywordAbsence ?? this.checkKeywordAbsence,
     );
   }
 
@@ -78,6 +98,10 @@ class Watch {
       WatchFields.lastStatus: lastStatus,
       WatchFields.lastCheckTime: lastCheckTime?.toIso8601String(),
       WatchFields.isActive: isActive ? 1 : 0,
+      WatchFields.consecutiveFails: consecutiveFails,
+      WatchFields.latencyThreshold: latencyThreshold,
+      WatchFields.alertOnSslExpiry: alertOnSslExpiry ? 1 : 0,
+      WatchFields.checkKeywordAbsence: checkKeywordAbsence ? 1 : 0,
     };
   }
 
@@ -95,6 +119,10 @@ class Watch {
           ? DateTime.parse(map[WatchFields.lastCheckTime] as String)
           : null,
       isActive: map[WatchFields.isActive] == 1,
+      consecutiveFails: map[WatchFields.consecutiveFails] as int? ?? 0,
+      latencyThreshold: map[WatchFields.latencyThreshold] as int?,
+      alertOnSslExpiry: map[WatchFields.alertOnSslExpiry] == 1,
+      checkKeywordAbsence: map[WatchFields.checkKeywordAbsence] == 1,
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 import '../database_helper.dart';
 import '../models/watch.dart';
@@ -104,6 +105,13 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
                   _buildHistoryChart(),
                   const SizedBox(height: 24),
                   const Text(
+                    'Response Time (Last 50)',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildResponseTimeChart(),
+                  const SizedBox(height: 24),
+                  const Text(
                     'Recent Logs',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
@@ -112,6 +120,67 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildResponseTimeChart() {
+    final recentLogsWithTime = _logs.where((l) => l.responseTimeMs != null).toList().reversed.take(50).toList().reversed.toList();
+    if (recentLogsWithTime.isEmpty) {
+      return const Text('No response time data available yet.');
+    }
+
+    final List<FlSpot> spots = [];
+    double maxTime = 0;
+
+    for (int i = 0; i < recentLogsWithTime.length; i++) {
+      final timeMs = recentLogsWithTime[i].responseTimeMs!.toDouble();
+      if (timeMs > maxTime) maxTime = timeMs;
+      spots.add(FlSpot(i.toDouble(), timeMs));
+    }
+
+    return SizedBox(
+      height: 200,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 16.0),
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(show: true),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 40,
+                  getTitlesWidget: (value, meta) {
+                    if (value == 0) return const Text('');
+                    return Text('${value.toInt()}ms', style: const TextStyle(fontSize: 10));
+                  },
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: true),
+            minX: 0,
+            maxX: spots.isNotEmpty ? spots.last.x : 0,
+            minY: 0,
+            maxY: maxTime * 1.2, // Give it some headroom
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                color: Colors.blue,
+                barWidth: 2,
+                dotData: FlDotData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: Colors.blue.withValues(alpha: 0.1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -210,7 +279,7 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
           title: Text(DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp)),
           subtitle: Text(
             log.status
-                ? 'Status: ${log.statusCode}'
+                ? 'Status: ${log.statusCode}${log.responseTimeMs != null ? " • ${log.responseTimeMs}ms" : ""}'
                 : 'Error: ${log.errorMessage ?? "Status ${log.statusCode}"}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

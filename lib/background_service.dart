@@ -1,29 +1,86 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:workmanager/workmanager.dart';
-import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:home_widget/home_widget.dart';
 
 import 'database_helper.dart';
-
 import 'models/watch_log.dart';
 
+Future<void> initializeService() async {
+  final service = FlutterBackgroundService();
+
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'watch_alert_channel', // id
+    'Watch Alerts', // name
+    description: 'Alerts when a watch fails its check', // description
+    importance: Importance.max, // importance must be at low or higher level
+  );
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  if (Platform.isAndroid) {
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
+
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: onStart,
+      autoStart: true,
+      isForegroundMode: true,
+      notificationChannelId: 'watch_alert_channel',
+      initialNotificationTitle: 'Watch App Service',
+      initialNotificationContent: 'Monitoring watches...',
+      foregroundServiceNotificationId: 888,
+    ),
+    iosConfiguration: IosConfiguration(
+      autoStart: true,
+      onForeground: onStart,
+      onBackground: onIosBackground,
+    ),
+  );
+}
+
 @pragma('vm:entry-point')
-void callbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async {
-    developer.log("Native called background task: $task");
+Future<bool> onIosBackground(ServiceInstance service) async {
+  return true;
+}
+
+@pragma('vm:entry-point')
+void onStart(ServiceInstance service) async {
+  // Only available for flutter 3.0.0 and later
+  developer.log("Background service started");
+
+  final dbHelper = DatabaseHelper.instance;
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  final dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+  ));
+
+  // Run the check loop periodically
+  Timer.periodic(const Duration(minutes: 1), (timer) async {
     try {
-      final dbHelper = DatabaseHelper.instance;
       final watches = await dbHelper.readAllWatches();
-
-      final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-          FlutterLocalNotificationsPlugin();
-
-      const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-      const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-      );
-      await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+      int totalWatches = 0;
+      int errorWatches = 0;
 
       for (final watch in watches) {
         if (!watch.isActive) continue;
@@ -40,24 +97,73 @@ void callbackDispatcher() {
         bool hasError = false;
         String errorMessage = '';
         int? currentStatus;
+        int? responseTimeMs;
 
         try {
-          final response = await http.get(Uri.parse(watch.url));
+          final stopwatch = Stopwatch()..start();
+          final response = await dio.get(watch.url);
+          stopwatch.stop();
+          responseTimeMs = stopwatch.elapsedMilliseconds;
           currentStatus = response.statusCode;
 
-          if (response.statusCode < 200 || response.statusCode > 299) {
+          if (response.statusCode == null || response.statusCode! < 200 || response.statusCode! > 299) {
             hasError = true;
             errorMessage = 'Status code is ${response.statusCode}, expected 200-299.';
           } else if (watch.keyword != null && watch.keyword!.isNotEmpty) {
-            if (!response.body.contains(watch.keyword!)) {
-              hasError = true;
-              errorMessage = 'Keyword "${watch.keyword!}" not found.';
+            bool containsKeyword = response.data.toString().contains(watch.keyword!);
+            if (watch.checkKeywordAbsence) {
+              if (containsKeyword) {
+                hasError = true;
+                errorMessage = 'Keyword "${watch.keyword!}" was found (configured to alert on presence).';
+              }
+            } else {
+              if (!containsKeyword) {
+                hasError = true;
+                errorMessage = 'Keyword "${watch.keyword!}" not found.';
+              }
             }
           }
+
+          if (!hasError && watch.latencyThreshold != null && responseTimeMs > watch.latencyThreshold!) {
+            hasError = true;
+            errorMessage = 'Response time ${responseTimeMs}ms exceeded threshold of ${watch.latencyThreshold}ms.';
+          }
+
+          if (!hasError && watch.alertOnSslExpiry && watch.url.startsWith('https')) {
+            try {
+              final uri = Uri.parse(watch.url);
+              final socket = await SecureSocket.connect(uri.host, uri.port.toInt() == 0 ? 443 : uri.port,
+                  timeout: const Duration(seconds: 5));
+              final cert = socket.peerCertificate;
+              if (cert != null) {
+                final expiry = cert.endValidity;
+                final daysUntilExpiry = expiry.difference(now).inDays;
+                if (daysUntilExpiry <= 14) {
+                  hasError = true;
+                  errorMessage = 'SSL Certificate expires in $daysUntilExpiry days.';
+                }
+              }
+              socket.destroy();
+            } catch (e) {
+              hasError = true;
+              errorMessage = 'Failed to check SSL certificate: $e';
+            }
+          }
+        } on DioException catch (e) {
+          hasError = true;
+          errorMessage = 'Network error: ${e.message}';
+          currentStatus = e.response?.statusCode;
         } catch (e) {
           hasError = true;
           errorMessage = 'Failed to connect: $e';
         }
+
+        // Retry logic: keep track of consecutive fails
+        int updatedFails = hasError ? watch.consecutiveFails + 1 : 0;
+        bool shouldAlert = hasError && updatedFails >= 3; // Retry Count logic
+
+        totalWatches++;
+        if (hasError) errorWatches++;
 
         // Update database with last check time and status
         // If there was an error not related to status code (e.g. keyword or connection failed),
@@ -71,6 +177,7 @@ void callbackDispatcher() {
         await dbHelper.update(watch.copyWith(
           lastCheckTime: now,
           lastStatus: statusToSave,
+          consecutiveFails: updatedFails,
         ));
 
         // Create log entry
@@ -81,6 +188,7 @@ void callbackDispatcher() {
             status: !hasError,
             statusCode: currentStatus, // Keep real status code in logs
             errorMessage: errorMessage.isNotEmpty ? errorMessage : null,
+            responseTimeMs: responseTimeMs,
           ));
         }
 
@@ -88,7 +196,7 @@ void callbackDispatcher() {
         final thirtyOneDaysAgo = now.subtract(const Duration(days: 31));
         await dbHelper.deleteOldWatchLogs(thirtyOneDaysAgo);
 
-        if (hasError) {
+        if (shouldAlert) {
           // Show notification
           const AndroidNotificationDetails androidPlatformChannelSpecifics =
               AndroidNotificationDetails(
@@ -97,6 +205,7 @@ void callbackDispatcher() {
             channelDescription: 'Alerts when a watch fails its check',
             importance: Importance.max,
             priority: Priority.high,
+            groupKey: 'watch_alert_group',
           );
           const NotificationDetails platformChannelSpecifics =
               NotificationDetails(android: androidPlatformChannelSpecifics);
@@ -107,11 +216,43 @@ void callbackDispatcher() {
             errorMessage,
             platformChannelSpecifics,
           );
+
+          // Show Group Summary
+          const AndroidNotificationDetails summaryAndroidPlatformChannelSpecifics =
+              AndroidNotificationDetails(
+            'watch_alert_channel',
+            'Watch Alerts',
+            channelDescription: 'Alerts when a watch fails its check',
+            importance: Importance.max,
+            priority: Priority.high,
+            groupKey: 'watch_alert_group',
+            setAsGroupSummary: true,
+          );
+
+          const NotificationDetails summaryPlatformChannelSpecifics =
+              NotificationDetails(android: summaryAndroidPlatformChannelSpecifics);
+
+          await flutterLocalNotificationsPlugin.show(
+            0, // Group Summary ID
+            'Watch Alerts Summary',
+            'Multiple watches are experiencing issues.',
+            summaryPlatformChannelSpecifics,
+          );
         }
       }
+
+      // Update widget
+      String statusText = errorWatches > 0
+          ? '$errorWatches / $totalWatches DOWN'
+          : 'All $totalWatches systems UP';
+
+      await HomeWidget.saveWidgetData<String>('widget_status', statusText);
+      await HomeWidget.updateWidget(
+        androidName: 'AppWidgetProvider',
+      );
+
     } catch (e) {
-      developer.log("Error in background task: $e");
+      developer.log("Error in background timer: $e");
     }
-    return Future.value(true);
   });
 }
