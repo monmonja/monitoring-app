@@ -25,10 +25,13 @@ Future<void> initializeService() async {
       FlutterLocalNotificationsPlugin();
 
   if (Platform.isAndroid) {
-    await flutterLocalNotificationsPlugin
+    final androidPlugin = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    await androidPlugin?.createNotificationChannel(channel);
+
+    await androidPlugin?.requestNotificationsPermission();
   }
 
   await service.configure(
