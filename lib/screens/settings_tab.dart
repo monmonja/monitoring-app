@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/theme_manager.dart';
@@ -17,6 +19,31 @@ class SettingsTab extends StatefulWidget {
 }
 
 class _SettingsTabState extends State<SettingsTab> {
+  double _batteryMultiplier = 1.0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _batteryMultiplier = prefs.getDouble('battery_multiplier') ?? 1.0;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveBatteryMultiplier(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('battery_multiplier', value);
+    setState(() {
+      _batteryMultiplier = value;
+    });
+  }
+
   Future<void> _exportData() async {
     try {
       final jsonString = await DatabaseHelper.instance.exportData();
@@ -72,60 +99,56 @@ class _SettingsTabState extends State<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     final isDark = widget.themeManager.isDarkMode;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
-          const SizedBox(height: 8),
-          _SectionHeader(title: 'Appearance'),
-          ListTile(
-            leading: Icon(
-              isDark ? Icons.dark_mode : Icons.light_mode,
-              color: AppColors.primary,
-            ),
-            title: const Text('Theme'),
-            subtitle: Text(isDark ? 'Dark Mode' : 'Light Mode'),
-            trailing: SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  icon: Icon(Icons.light_mode),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  icon: Icon(Icons.brightness_auto),
-                ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  icon: Icon(Icons.dark_mode),
-                ),
-              ],
-              selected: {widget.themeManager.themeMode},
-              onSelectionChanged: (selected) {
-                widget.themeManager.setThemeMode(selected.first);
-              },
-              style: ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Data Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
-          const Divider(),
-          _SectionHeader(title: 'Data Management'),
           ListTile(
             leading: const Icon(Icons.upload_file),
             title: const Text('Export Data'),
             subtitle: const Text('Save your watches configuration to a file'),
             onTap: _exportData,
           ),
-          const Divider(),
           ListTile(
             leading: const Icon(Icons.file_download),
             title: const Text('Import Data'),
             subtitle: const Text('Load watches configuration from a file (overwrites existing)'),
             onTap: _importData,
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Power & Performance', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.battery_saver),
+            title: const Text('Battery Saver Multiplier'),
+            subtitle: const Text('Multiply check intervals when battery is <20% or in battery saver mode.'),
+            trailing: DropdownButton<double>(
+              value: _batteryMultiplier,
+              items: const [
+                DropdownMenuItem(value: 0.5, child: Text('0.5x')),
+                DropdownMenuItem(value: 1.0, child: Text('1x (Default)')),
+                DropdownMenuItem(value: 2.0, child: Text('2x')),
+                DropdownMenuItem(value: 3.0, child: Text('3x')),
+                DropdownMenuItem(value: 4.0, child: Text('4x')),
+                DropdownMenuItem(value: 5.0, child: Text('5x')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  _saveBatteryMultiplier(value);
+                }
+              },
+            ),
           ),
         ],
       ),

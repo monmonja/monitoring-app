@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:battery_plus/battery_plus.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:home_widget/home_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'database_helper.dart';
 import 'models/watch_log.dart';
@@ -79,10 +82,25 @@ void onStart(ServiceInstance service) async {
     receiveTimeout: const Duration(seconds: 10),
   ));
 
+  final battery = Battery();
+  final connectivity = Connectivity();
+
   // Run the check loop periodically
   Timer.periodic(const Duration(minutes: 1), (timer) async {
     try {
       final watches = await dbHelper.readAllWatches();
+
+      // Get device states
+      final prefs = await SharedPreferences.getInstance();
+      final batteryMultiplier = prefs.getDouble('battery_multiplier') ?? 1.0;
+      final batteryLevel = await battery.batteryLevel;
+      final isBatterySaverOn = await battery.isInBatterySaveMode;
+
+      final connectivityResult = await connectivity.checkConnectivity();
+      final isWifi = connectivityResult.contains(ConnectivityResult.wifi);
+
+      // Apply power policy: multiply interval if battery is low or in power save mode
+      bool applyPowerPolicy = batteryLevel < 20 || isBatterySaverOn;
       int totalWatches = 0;
       int errorWatches = 0;
 
@@ -93,9 +111,28 @@ void onStart(ServiceInstance service) async {
         final now = DateTime.now();
         if (watch.lastCheckTime != null) {
           final difference = now.difference(watch.lastCheckTime!);
-          if (difference.inMinutes < watch.intervalMinutes) {
+          final effectiveInterval = applyPowerPolicy ? (watch.intervalMinutes * batteryMultiplier).ceil() : watch.intervalMinutes;
+
+          if (difference.inMinutes < effectiveInterval) {
             continue;
           }
+        }
+
+        if (watch.wifiOnly && !isWifi) {
+          // Log skipped check due to wifi policy
+          if (watch.id != null) {
+            await dbHelper.createWatchLog(WatchLog(
+              watchId: watch.id!,
+              timestamp: now,
+              status: false,
+              statusCode: 0,
+              errorMessage: 'Skipped: Not on Wi-Fi',
+              responseTimeMs: null,
+            ));
+          }
+          // Update last check time without incrementing fails or alerting
+          await dbHelper.update(watch.copyWith(lastCheckTime: now));
+          continue;
         }
 
         bool hasError = false;
