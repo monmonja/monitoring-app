@@ -53,6 +53,14 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
     }
   }
 
+  Future<void> _toggleIsActive(bool value) async {
+    final updatedWatch = _currentWatch.copyWith(isActive: value);
+    await DatabaseHelper.instance.update(updatedWatch);
+    setState(() {
+      _currentWatch = updatedWatch;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,6 +87,14 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SwitchListTile(
+                    title: const Text('Monitoring Active', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Pause or resume monitoring for this watch'),
+                    value: _currentWatch.isActive,
+                    onChanged: _toggleIsActive,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  const Divider(),
                   _buildDetailRow('URL', _currentWatch.url),
                   _buildDetailRow('Interval', '${_currentWatch.intervalMinutes} minutes'),
                   _buildDetailRow('Expected Status', '200-299'),
