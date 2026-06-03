@@ -30,6 +30,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
   String _httpMethod = 'HEAD';
   final List<Map<String, TextEditingController>> _headers = [];
   late TextEditingController _httpBodyController;
+  late TextEditingController _urlController;
 
   @override
   void initState() {
@@ -45,6 +46,8 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
 
     _httpMethod = widget.watch?.httpMethod ?? 'HEAD';
     _httpBodyController = TextEditingController(text: widget.watch?.httpBody ?? '');
+    _urlController = TextEditingController(text: _url);
+    _urlController.addListener(_autoSelectDomain);
 
     if (widget.watch?.httpHeaders != null) {
       try {
@@ -70,6 +73,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
       header['value']?.dispose();
     }
     _httpBodyController.dispose();
+    _urlController.dispose();
     super.dispose();
   }
 
@@ -82,6 +86,26 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
         _selectedDomainId = _domains.first.id;
       }
     });
+    _autoSelectDomain();
+  }
+
+  void _autoSelectDomain() {
+    if (_domains.isEmpty) return;
+
+    final uri = Uri.tryParse(_urlController.text);
+    if (uri == null || !uri.isAbsolute || uri.host.isEmpty) return;
+
+    for (final domain in _domains) {
+      final domainUri = Uri.tryParse(domain.url);
+      if (domainUri != null && domainUri.host == uri.host) {
+        if (_selectedDomainId != domain.id) {
+          setState(() {
+            _selectedDomainId = domain.id;
+          });
+        }
+        return;
+      }
+    }
   }
 
   void _addHeader() {
@@ -106,6 +130,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
     if (!isValid) return;
 
     _formKey.currentState!.save();
+    _url = _urlController.text;
 
     if (_selectedDomainId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -241,7 +266,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
                             Expanded(
                               flex: 3,
                               child: TextFormField(
-                                initialValue: _url,
+                                controller: _urlController,
                                 decoration: const InputDecoration(labelText: 'URL'),
                                 keyboardType: TextInputType.url,
                                 validator: (value) {
@@ -253,7 +278,6 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
                                   }
                                   return null;
                                 },
-                                onSaved: (value) => _url = value!,
                               ),
                             ),
                           ],
