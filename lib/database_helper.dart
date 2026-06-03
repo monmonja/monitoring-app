@@ -25,11 +25,8 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    // Bumping version to 5 for new tracking fields
-    // To simplify for dev, we can just drop tables and recreate, or implement the upgrade.
-    // Given the previous instruction "no db migration, havent build the app yet",
-    // we can safely just adjust _createDB. But to be safe if someone ran it, we'll implement _upgradeDB.
-    return await openDatabase(path, version: 5, onCreate: _createDB, onUpgrade: _upgradeDB);
+    // Bumping version to 6 for httpMethod, httpHeaders, httpBody
+    return await openDatabase(path, version: 6, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -64,6 +61,9 @@ CREATE TABLE watches (
   latencyThreshold INTEGER,
   alertOnSslExpiry BOOLEAN NOT NULL DEFAULT 0,
   checkKeywordAbsence BOOLEAN NOT NULL DEFAULT 0,
+  httpMethod TEXT NOT NULL DEFAULT 'HEAD',
+  httpHeaders TEXT,
+  httpBody TEXT,
   FOREIGN KEY (domainId) REFERENCES domains (id) ON DELETE CASCADE
 )
 ''');
@@ -104,17 +104,10 @@ CREATE TABLE watch_logs (
 ''');
     }
     if (oldVersion < 3) {
-      // Handle the rename of expectedString to keyword.
-      // SQLite doesn't directly support RENAME COLUMN in all versions commonly used,
-      // but newer versions do. Let's just add the column if it doesn't exist.
-      // Since we just changed expectedString to keyword in the create statement,
-      // let's alter table.
       try {
         await db.execute('ALTER TABLE watches RENAME COLUMN expectedString TO keyword');
       } catch (e) {
-        // If rename fails (older sqlite), add column
         await db.execute('ALTER TABLE watches ADD COLUMN keyword TEXT');
-        // Migrate data
         await db.execute('UPDATE watches SET keyword = expectedString');
       }
     }
@@ -130,7 +123,6 @@ CREATE TABLE domains (
 )
 ''');
 
-      // Default domain to avoid breaking existing data
       int defaultDomainId = await db.insert('domains', {
         'name': 'Default Domain',
         'url': 'http://localhost'
@@ -145,6 +137,11 @@ CREATE TABLE domains (
       await db.execute('ALTER TABLE watches ADD COLUMN checkKeywordAbsence BOOLEAN NOT NULL DEFAULT 0');
 
       await db.execute('ALTER TABLE watch_logs ADD COLUMN responseTimeMs INTEGER');
+    }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE watches ADD COLUMN httpMethod TEXT NOT NULL DEFAULT "HEAD"');
+      await db.execute('ALTER TABLE watches ADD COLUMN httpHeaders TEXT');
+      await db.execute('ALTER TABLE watches ADD COLUMN httpBody TEXT');
     }
   }
 
@@ -191,9 +188,6 @@ CREATE TABLE domains (
 
   Future<int> deleteDomain(int id) async {
     final db = await instance.database;
-    // Watches have ON DELETE CASCADE so they should be deleted automatically by sqlite
-    // but flutter's sqflite needs PRAGMA foreign_keys = ON; enabled which might not be on by default.
-    // Let's delete watches manually to be safe.
     final watches = await readWatchesForDomain(id);
     for (var w in watches) {
       await delete(w.id!);

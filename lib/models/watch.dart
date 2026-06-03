@@ -1,6 +1,6 @@
 class WatchFields {
   static final List<String> values = [
-    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence
+    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence, httpMethod, httpHeaders, httpBody
   ];
 
   static const String id = 'id';
@@ -17,6 +17,9 @@ class WatchFields {
   static const String latencyThreshold = 'latencyThreshold';
   static const String alertOnSslExpiry = 'alertOnSslExpiry';
   static const String checkKeywordAbsence = 'checkKeywordAbsence';
+  static const String httpMethod = 'httpMethod';
+  static const String httpHeaders = 'httpHeaders';
+  static const String httpBody = 'httpBody';
 }
 
 class Watch {
@@ -34,6 +37,9 @@ class Watch {
   final int? latencyThreshold;
   final bool alertOnSslExpiry;
   final bool checkKeywordAbsence;
+  final String httpMethod;
+  final String? httpHeaders;
+  final String? httpBody;
 
   const Watch({
     this.id,
@@ -50,6 +56,9 @@ class Watch {
     this.latencyThreshold,
     this.alertOnSslExpiry = false,
     this.checkKeywordAbsence = false,
+    this.httpMethod = 'HEAD',
+    this.httpHeaders,
+    this.httpBody,
   });
 
   Watch copyWith({
@@ -67,6 +76,9 @@ class Watch {
     int? latencyThreshold,
     bool? alertOnSslExpiry,
     bool? checkKeywordAbsence,
+    String? httpMethod,
+    String? httpHeaders,
+    String? httpBody,
   }) {
     return Watch(
       id: id ?? this.id,
@@ -83,6 +95,9 @@ class Watch {
       latencyThreshold: latencyThreshold ?? this.latencyThreshold,
       alertOnSslExpiry: alertOnSslExpiry ?? this.alertOnSslExpiry,
       checkKeywordAbsence: checkKeywordAbsence ?? this.checkKeywordAbsence,
+      httpMethod: httpMethod ?? this.httpMethod,
+      httpHeaders: httpHeaders ?? this.httpHeaders,
+      httpBody: httpBody ?? this.httpBody,
     );
   }
 
@@ -102,6 +117,9 @@ class Watch {
       WatchFields.latencyThreshold: latencyThreshold,
       WatchFields.alertOnSslExpiry: alertOnSslExpiry ? 1 : 0,
       WatchFields.checkKeywordAbsence: checkKeywordAbsence ? 1 : 0,
+      WatchFields.httpMethod: httpMethod,
+      WatchFields.httpHeaders: httpHeaders,
+      WatchFields.httpBody: httpBody,
     };
   }
 
@@ -123,6 +141,9 @@ class Watch {
       latencyThreshold: map[WatchFields.latencyThreshold] as int?,
       alertOnSslExpiry: map[WatchFields.alertOnSslExpiry] == 1,
       checkKeywordAbsence: map[WatchFields.checkKeywordAbsence] == 1,
+      httpMethod: map[WatchFields.httpMethod] as String? ?? 'HEAD',
+      httpHeaders: map[WatchFields.httpHeaders] as String?,
+      httpBody: map[WatchFields.httpBody] as String?,
     );
   }
 }

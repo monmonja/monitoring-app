@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 
@@ -101,7 +102,27 @@ void onStart(ServiceInstance service) async {
 
         try {
           final stopwatch = Stopwatch()..start();
-          final response = await dio.get(watch.url);
+
+          Map<String, dynamic>? headersMap;
+          if (watch.httpHeaders != null) {
+            try {
+              headersMap = jsonDecode(watch.httpHeaders!);
+            } catch (e) {
+              developer.log("Error decoding headers: $e");
+            }
+          }
+
+          final options = Options(
+            method: watch.httpMethod,
+            headers: headersMap,
+          );
+
+          final response = await dio.request(
+            watch.url,
+            data: watch.httpBody,
+            options: options,
+          );
+
           stopwatch.stop();
           responseTimeMs = stopwatch.elapsedMilliseconds;
           currentStatus = response.statusCode;
