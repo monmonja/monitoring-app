@@ -232,12 +232,20 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
       dailyStatus[day] = true; // Assume success initially, or absent if no logs
     }
 
-    // A day is considered failure if there's any failure log in that day
-    final Map<DateTime, bool> actualDailyStatus = {};
+    // A day is considered failure if there's any failure log in that day. If skipped, record as skipped.
+    final Map<DateTime, String> actualDailyStatus = {};
     for (final log in _logs) {
       final logDay = DateTime(log.timestamp.year, log.timestamp.month, log.timestamp.day);
-      if (actualDailyStatus[logDay] == null || actualDailyStatus[logDay] == true) {
-        actualDailyStatus[logDay] = log.status;
+      bool isSkipped = !log.status && log.errorMessage != null && log.errorMessage!.startsWith('Skipped:');
+
+      if (actualDailyStatus[logDay] == null || actualDailyStatus[logDay] == 'success' || (actualDailyStatus[logDay] == 'skipped' && !isSkipped && !log.status)) {
+        if (!log.status && !isSkipped) {
+            actualDailyStatus[logDay] = 'failure';
+        } else if (isSkipped && actualDailyStatus[logDay] != 'failure') {
+            actualDailyStatus[logDay] = 'skipped';
+        } else if (log.status && actualDailyStatus[logDay] == null) {
+            actualDailyStatus[logDay] = 'success';
+        }
       }
     }
 
@@ -253,11 +261,17 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
 
           Color color = Colors.grey[300]!; // No data
           if (hasLogs) {
-            color = status == true ? Colors.green : Colors.red;
+            if (status == 'success') {
+                color = Colors.green;
+            } else if (status == 'failure') {
+                color = Colors.red;
+            } else if (status == 'skipped') {
+                color = Colors.orange;
+            }
           }
 
           return Tooltip(
-            message: DateFormat('MMM d').format(day),
+            message: '${DateFormat('MMM d').format(day)}: ${status ?? 'No Data'}',
             child: Container(
               width: 10,
               margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -286,17 +300,18 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
       itemCount: recentLogs.length,
       itemBuilder: (context, index) {
         final log = recentLogs[index];
+        bool isSkipped = !log.status && log.errorMessage != null && log.errorMessage!.startsWith('Skipped:');
         return ListTile(
           dense: true,
           leading: Icon(
-            log.status ? Icons.check_circle : Icons.error,
-            color: log.status ? Colors.green : Colors.red,
+            log.status ? Icons.check_circle : (isSkipped ? Icons.skip_next : Icons.error),
+            color: log.status ? Colors.green : (isSkipped ? Colors.orange : Colors.red),
           ),
           title: Text(DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp)),
           subtitle: Text(
             log.status
                 ? 'Status: ${log.statusCode}${log.responseTimeMs != null ? " • ${log.responseTimeMs}ms" : ""}'
-                : 'Error: ${log.errorMessage ?? "Status ${log.statusCode}"}',
+                : (isSkipped ? '${log.errorMessage}' : 'Error: ${log.errorMessage ?? "Status ${log.statusCode}"}'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

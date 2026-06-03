@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database_helper.dart';
 
@@ -14,6 +14,31 @@ class SettingsTab extends StatefulWidget {
 }
 
 class _SettingsTabState extends State<SettingsTab> {
+  double _batteryMultiplier = 1.0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _batteryMultiplier = prefs.getDouble('battery_multiplier') ?? 1.0;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveBatteryMultiplier(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('battery_multiplier', value);
+    setState(() {
+      _batteryMultiplier = value;
+    });
+  }
+
   Future<void> _exportData() async {
     try {
       final jsonString = await DatabaseHelper.instance.exportData();
@@ -69,22 +94,55 @@ class _SettingsTabState extends State<SettingsTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Data Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
           ListTile(
             leading: const Icon(Icons.upload_file),
             title: const Text('Export Data'),
             subtitle: const Text('Save your watches configuration to app documents'),
             onTap: _exportData,
           ),
-          const Divider(),
           ListTile(
             leading: const Icon(Icons.file_download),
             title: const Text('Import Data'),
             subtitle: const Text('Load watches configuration from app documents (overwrites existing)'),
             onTap: _importData,
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Power & Performance', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.battery_saver),
+            title: const Text('Battery Saver Multiplier'),
+            subtitle: const Text('Multiply check intervals when battery is <20% or in battery saver mode.'),
+            trailing: DropdownButton<double>(
+              value: _batteryMultiplier,
+              items: const [
+                DropdownMenuItem(value: 0.5, child: Text('0.5x')),
+                DropdownMenuItem(value: 1.0, child: Text('1x (Default)')),
+                DropdownMenuItem(value: 2.0, child: Text('2x')),
+                DropdownMenuItem(value: 3.0, child: Text('3x')),
+                DropdownMenuItem(value: 4.0, child: Text('4x')),
+                DropdownMenuItem(value: 5.0, child: Text('5x')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  _saveBatteryMultiplier(value);
+                }
+              },
+            ),
           ),
         ],
       ),

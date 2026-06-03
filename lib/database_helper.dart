@@ -25,8 +25,8 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    // Bumping version to 6 for httpMethod, httpHeaders, httpBody
-    return await openDatabase(path, version: 6, onCreate: _createDB, onUpgrade: _upgradeDB);
+    // Bumping version to 7 for wifiOnly
+    return await openDatabase(path, version: 7, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -64,6 +64,7 @@ CREATE TABLE watches (
   httpMethod TEXT NOT NULL DEFAULT 'HEAD',
   httpHeaders TEXT,
   httpBody TEXT,
+  wifiOnly BOOLEAN NOT NULL DEFAULT 1,
   FOREIGN KEY (domainId) REFERENCES domains (id) ON DELETE CASCADE
 )
 ''');
@@ -80,6 +81,10 @@ CREATE TABLE watch_logs (
   FOREIGN KEY (watchId) REFERENCES watches (id) ON DELETE CASCADE
 )
 ''');
+
+    // Add index for fast query execution
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_watch_logs_timestamp ON watch_logs (timestamp)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_watch_logs_watchId ON watch_logs (watchId)');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -142,6 +147,13 @@ CREATE TABLE domains (
       await db.execute('ALTER TABLE watches ADD COLUMN httpMethod TEXT NOT NULL DEFAULT "HEAD"');
       await db.execute('ALTER TABLE watches ADD COLUMN httpHeaders TEXT');
       await db.execute('ALTER TABLE watches ADD COLUMN httpBody TEXT');
+    }
+    if (oldVersion < 7) {
+      await db.execute('ALTER TABLE watches ADD COLUMN wifiOnly BOOLEAN NOT NULL DEFAULT 1');
+
+      // Add index for fast query execution
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_watch_logs_timestamp ON watch_logs (timestamp)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_watch_logs_watchId ON watch_logs (watchId)');
     }
   }
 

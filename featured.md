@@ -19,4 +19,8 @@ This is a Flutter application designed to help users monitor websites by managin
 *   **Logs, Visuals, & History:** The app tracks the history of all status checks, logging response times, status codes, and error messages. Visual line charts (`fl_chart`) display response times over the last 50 checks. Old logs are automatically cleaned up after 31 days using `VACUUM` for optimized SQLite database performance.
 *   **Uptime Status Sharing:** Users can export a clean, text-based summary of their current system uptime directly from the dashboard using `share_plus`.
 *   **Home Screen Widget:** A convenient native Android home screen widget displays a quick summary of the monitoring status (e.g., how many sites are currently DOWN).
+*   **Power & Performance Optimization:**
+    *   **Smart Battery/Charging Policies:** Automatically scales down check intervals when battery drops below 20% or battery saver is on using a user-configurable multiplier.
+    *   **Wi-Fi Only Monitoring:** Allows restricting individual watches to execute checks only when the device is connected to a Wi-Fi network, saving mobile data.
+    *   **Database Tuning:** Uses optimized SQLite queries with indices and `VACUUM` to keep background database execution fast.
 *   **Settings:** Allows configuring the application.
