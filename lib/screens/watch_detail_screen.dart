@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../core/ad_banner.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
@@ -156,6 +157,9 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   _LogList(logs: _logs),
+                  const SizedBox(height: AppSpacing.md),
+                  const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
+                  const SizedBox(height: AppSpacing.md),
                 ],
               ),
             ),

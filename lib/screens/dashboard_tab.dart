@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import '../core/ad_banner.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
@@ -453,6 +454,9 @@ class _DashboardTabState extends State<DashboardTab> {
                         )
                       else
                         ..._buildWatchList(),
+                      const SizedBox(height: AppSpacing.sm),
+                      const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
+                      const SizedBox(height: AppSpacing.sm),
                     ],
                   ),
                 ),
