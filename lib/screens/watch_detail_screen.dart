@@ -219,7 +219,7 @@ class _HistoryChart extends StatelessWidget {
 
     // A day is considered failure if there's any failure log in that day. If skipped, record as skipped.
     final Map<DateTime, String> actualDailyStatus = {};
-    for (final log in _logs) {
+    for (final log in logs) {
       final logDay = DateTime(log.timestamp.year, log.timestamp.month, log.timestamp.day);
       bool isSkipped = !log.status && log.errorMessage != null && log.errorMessage!.startsWith('Skipped:');
 
@@ -249,11 +249,11 @@ class _HistoryChart extends StatelessWidget {
               : AppColors.borderLight;
           if (hasLogs) {
             if (status == 'success') {
-                color = Colors.green;
+                color = AppColors.success;
             } else if (status == 'failure') {
-                color = Colors.red;
+                color = AppColors.danger;
             } else if (status == 'skipped') {
-                color = Colors.orange;
+                color = AppColors.warning;
             }
           }
 
