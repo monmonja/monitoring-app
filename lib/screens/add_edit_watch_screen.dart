@@ -26,6 +26,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
   bool _checkKeywordAbsence = false;
   bool _alertOnSslExpiry = false;
   String? _latencyThreshold;
+  bool _wifiOnly = true;
 
   String _httpMethod = 'HEAD';
   final List<Map<String, TextEditingController>> _headers = [];
@@ -43,6 +44,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
     _checkKeywordAbsence = widget.watch?.checkKeywordAbsence ?? false;
     _alertOnSslExpiry = widget.watch?.alertOnSslExpiry ?? false;
     _latencyThreshold = widget.watch?.latencyThreshold?.toString();
+    _wifiOnly = widget.watch?.wifiOnly ?? true;
 
     _httpMethod = widget.watch?.httpMethod ?? 'HEAD';
     _httpBodyController = TextEditingController(text: widget.watch?.httpBody ?? '');
@@ -172,6 +174,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
       httpMethod: _httpMethod,
       httpHeaders: headersJson,
       httpBody: bodyStr,
+      wifiOnly: _wifiOnly,
     );
 
     if (widget.watch == null) {
@@ -374,6 +377,14 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
                           value: _alertOnSslExpiry,
                           onChanged: (val) {
                             setState(() => _alertOnSslExpiry = val);
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Wi-Fi Only Mode'),
+                          subtitle: const Text('Restrict checks to run only when connected to Wi-Fi'),
+                          value: _wifiOnly,
+                          onChanged: (val) {
+                            setState(() => _wifiOnly = val);
                           },
                         ),
                         const SizedBox(height: 32),

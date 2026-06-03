@@ -1,6 +1,6 @@
 class WatchFields {
   static final List<String> values = [
-    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence, httpMethod, httpHeaders, httpBody
+    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence, httpMethod, httpHeaders, httpBody, wifiOnly
   ];
 
   static const String id = 'id';
@@ -20,6 +20,7 @@ class WatchFields {
   static const String httpMethod = 'httpMethod';
   static const String httpHeaders = 'httpHeaders';
   static const String httpBody = 'httpBody';
+  static const String wifiOnly = 'wifiOnly';
 }
 
 class Watch {
@@ -40,6 +41,7 @@ class Watch {
   final String httpMethod;
   final String? httpHeaders;
   final String? httpBody;
+  final bool wifiOnly;
 
   const Watch({
     this.id,
@@ -59,6 +61,7 @@ class Watch {
     this.httpMethod = 'HEAD',
     this.httpHeaders,
     this.httpBody,
+    this.wifiOnly = true,
   });
 
   Watch copyWith({
@@ -79,6 +82,7 @@ class Watch {
     String? httpMethod,
     String? httpHeaders,
     String? httpBody,
+    bool? wifiOnly,
   }) {
     return Watch(
       id: id ?? this.id,
@@ -98,6 +102,7 @@ class Watch {
       httpMethod: httpMethod ?? this.httpMethod,
       httpHeaders: httpHeaders ?? this.httpHeaders,
       httpBody: httpBody ?? this.httpBody,
+      wifiOnly: wifiOnly ?? this.wifiOnly,
     );
   }
 
@@ -120,6 +125,7 @@ class Watch {
       WatchFields.httpMethod: httpMethod,
       WatchFields.httpHeaders: httpHeaders,
       WatchFields.httpBody: httpBody,
+      WatchFields.wifiOnly: wifiOnly ? 1 : 0,
     };
   }
 
@@ -144,6 +150,7 @@ class Watch {
       httpMethod: map[WatchFields.httpMethod] as String? ?? 'HEAD',
       httpHeaders: map[WatchFields.httpHeaders] as String?,
       httpBody: map[WatchFields.httpBody] as String?,
+      wifiOnly: map[WatchFields.wifiOnly] != null ? map[WatchFields.wifiOnly] == 1 : true,
     );
   }
 }
