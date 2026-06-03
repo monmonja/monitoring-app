@@ -4,10 +4,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+
+import '../core/theme/app_colors.dart';
+import '../core/theme/theme_manager.dart';
 import '../database_helper.dart';
 
 class SettingsTab extends StatefulWidget {
-  const SettingsTab({super.key});
+  final ThemeManager themeManager;
+
+  const SettingsTab({super.key, required this.themeManager});
 
   @override
   State<SettingsTab> createState() => _SettingsTabState();
@@ -97,6 +102,7 @@ class _SettingsTabState extends State<SettingsTab> {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final isDark = widget.themeManager.isDarkMode;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -109,13 +115,13 @@ class _SettingsTabState extends State<SettingsTab> {
           ListTile(
             leading: const Icon(Icons.upload_file),
             title: const Text('Export Data'),
-            subtitle: const Text('Save your watches configuration to app documents'),
+            subtitle: const Text('Save your watches configuration to a file'),
             onTap: _exportData,
           ),
           ListTile(
             leading: const Icon(Icons.file_download),
             title: const Text('Import Data'),
-            subtitle: const Text('Load watches configuration from app documents (overwrites existing)'),
+            subtitle: const Text('Load watches configuration from a file (overwrites existing)'),
             onTap: _importData,
           ),
           const Divider(),
@@ -145,6 +151,26 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+
+  const _SectionHeader({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

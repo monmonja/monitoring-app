@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
-
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
 import '../models/domain.dart';
 import '../models/watch.dart';
@@ -24,7 +24,7 @@ class _DashboardTabState extends State<DashboardTab> {
   List<Watch> _allWatches = [];
   List<Watch> _filteredWatches = [];
   List<Domain> _domains = [];
-  int? _selectedDomainId; // null means 'All Domains'
+  int? _selectedDomainId;
 
   int totalWatches = 0;
   int activeWatches = 0;
@@ -34,9 +34,11 @@ class _DashboardTabState extends State<DashboardTab> {
   bool _hasCheckedForDomains = false;
 
   String _searchQuery = '';
-  String _currentFilter = 'All'; // 'All', 'Down Only', 'Warnings'
+  String _currentFilter = 'All';
+  bool _isSearching = false;
 
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
@@ -51,18 +53,29 @@ class _DashboardTabState extends State<DashboardTab> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  void _stopSearching() {
+    setState(() {
+      _isSearching = false;
+    });
+    _searchController.clear();
+    _searchFocusNode.unfocus();
+    setState(() {
+      _searchQuery = '';
+    });
+    _applyFilters();
   }
 
   Future<void> _loadData() async {
     setState(() => isLoading = true);
 
-    // Load domains
     final domains = await DatabaseHelper.instance.readAllDomains();
 
     if (!_hasCheckedForDomains && domains.isEmpty) {
       _hasCheckedForDomains = true;
-      // Prompt user to create a domain on first load if none exist
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _promptCreateDomain();
       });
@@ -70,7 +83,6 @@ class _DashboardTabState extends State<DashboardTab> {
       _hasCheckedForDomains = true;
     }
 
-    // Load watches based on selection
     List<Watch> watches;
     if (_selectedDomainId == null) {
       watches = await DatabaseHelper.instance.readAllWatches();
@@ -143,7 +155,7 @@ class _DashboardTabState extends State<DashboardTab> {
     final watchesToCheck = List<Watch>.from(_filteredWatches);
 
     for (var i = 0; i < watchesToCheck.length; i++) {
-      if (!_isManualChecking) break; // User stopped the check
+      if (!_isManualChecking) break;
 
       final watch = watchesToCheck[i];
       if (!watch.isActive) continue;
@@ -258,7 +270,6 @@ class _DashboardTabState extends State<DashboardTab> {
         ));
       }
 
-      // Update local state temporarily to show progress safely
       if (mounted) {
         setState(() {
           int index = _filteredWatches.indexWhere((w) => w.id == watch.id);
@@ -271,10 +282,9 @@ class _DashboardTabState extends State<DashboardTab> {
 
     if (mounted) {
       setState(() => _isManualChecking = false);
-      await _loadData(); // fully reload from db to ensure everything is synced
+      await _loadData();
     }
   }
-
 
   Future<void> _promptCreateDomain() async {
     await showDialog(
@@ -300,70 +310,81 @@ class _DashboardTabState extends State<DashboardTab> {
     );
   }
 
-  Future<void> _shareStatus() async {
-    if (_allWatches.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No watches to share.')),
-      );
-      return;
-    }
-
-    final buffer = StringBuffer();
-    buffer.writeln('Uptime Status Report');
-    buffer.writeln('--------------------');
-    buffer.writeln('Total: $totalWatches | Active: $activeWatches | Errors: $errorWatches\n');
-
-    for (var watch in _allWatches) {
-      if (!watch.isActive) continue;
-
-      final hasError = watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
-      final statusString = watch.lastStatus == null ? 'Pending' : (hasError ? 'DOWN' : 'UP');
-      buffer.writeln('- ${watch.name} ($statusString)');
-      buffer.writeln('  URL: ${watch.url}');
-    }
-
-    // ignore: deprecated_member_use
-    await Share.share(buffer.toString(), subject: 'System Uptime Status Report');
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: _domains.isEmpty
-          ? const Text('Dashboard')
-          : DropdownButtonHideUnderline(
-              child: DropdownButton<int?>(
-                value: _selectedDomainId,
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                dropdownColor: Theme.of(context).primaryColor,
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                items: [
-                  const DropdownMenuItem<int?>(
-                    value: null,
-                    child: Text('All Domains'),
-                  ),
-                  ..._domains.map((domain) {
-                    return DropdownMenuItem<int?>(
-                      value: domain.id,
-                      child: Text(domain.name),
-                    );
-                  }),
-                ],
-                onChanged: (int? newValue) {
-                  setState(() {
-                    _selectedDomainId = newValue;
-                  });
-                  _loadData();
-                },
+        title: _isSearching
+          ? TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Search watches...',
+                border: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
               ),
-            ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+                _applyFilters();
+              },
+            )
+          : _domains.isEmpty
+              ? const Text('Dashboard')
+              : DropdownButtonHideUnderline(
+                  child: DropdownButton<int?>(
+                    value: _selectedDomainId,
+                    icon: const Icon(Icons.arrow_drop_down),
+                    dropdownColor: theme.brightness == Brightness.dark
+                        ? AppColors.cardDark
+                        : AppColors.cardLight,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('All Domains'),
+                      ),
+                      ..._domains.map((domain) {
+                        return DropdownMenuItem<int?>(
+                          value: domain.id,
+                          child: Text(domain.name),
+                        );
+                      }),
+                    ],
+                    onChanged: (int? newValue) {
+                      setState(() {
+                        _selectedDomainId = newValue;
+                      });
+                      _loadData();
+                    },
+                  ),
+                ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: 'Share Status',
-            onPressed: _shareStatus,
-          ),
+          if (_isSearching)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _stopSearching,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: 'Search',
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+                _searchFocusNode.requestFocus();
+              },
+            ),
         ],
       ),
       body: isLoading
@@ -373,59 +394,21 @@ class _DashboardTabState extends State<DashboardTab> {
                 RefreshIndicator(
                   onRefresh: _manualRefresh,
                   child: ListView(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildSummaryCard('Total', totalWatches.toString(), Colors.blue),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildSummaryCard('Active', activeWatches.toString(), Colors.green),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildSummaryCard('Errors', errorWatches.toString(), errorWatches > 0 ? Colors.red : Colors.grey),
-                          ),
-                        ],
+                      _SummaryRow(
+                        total: totalWatches.toString(),
+                        active: activeWatches.toString(),
+                        errors: errorWatches.toString(),
+                        hasErrors: errorWatches > 0,
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search watches...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchQuery.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = '';
-                                    });
-                                    _applyFilters();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value;
-                          });
-                          _applyFilters();
-                        },
-                      ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: ['All', 'Down Only', 'Warnings'].map((filter) {
                             return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
+                              padding: const EdgeInsets.only(right: AppSpacing.xs),
                               child: ChoiceChip(
                                 label: Text(filter),
                                 selected: _currentFilter == filter,
@@ -440,13 +423,15 @@ class _DashboardTabState extends State<DashboardTab> {
                           }).toList(),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Watches Status',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           if (_isManualChecking)
                             TextButton.icon(
@@ -455,15 +440,15 @@ class _DashboardTabState extends State<DashboardTab> {
                                   _isManualChecking = false;
                                 });
                               },
-                              icon: const Icon(Icons.stop, color: Colors.red),
-                              label: const Text('Stop', style: TextStyle(color: Colors.red)),
+                              icon: const Icon(Icons.stop, color: AppColors.danger),
+                              label: const Text('Stop', style: TextStyle(color: AppColors.danger)),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.xs),
                       if (_filteredWatches.isEmpty)
                         const Padding(
-                          padding: EdgeInsets.all(16.0),
+                          padding: EdgeInsets.all(AppSpacing.md),
                           child: Center(child: Text('No watches found matching criteria.')),
                         )
                       else
@@ -478,19 +463,21 @@ class _DashboardTabState extends State<DashboardTab> {
                     right: 0,
                     child: Center(
                       child: Card(
-                        color: Colors.black87,
+                        color: theme.brightness == Brightness.dark
+                            ? AppColors.cardDark
+                            : AppColors.cardLight,
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: const [
                               SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                child: CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              SizedBox(width: 16),
-                              Text('Checking watches...', style: TextStyle(color: Colors.white)),
+                              SizedBox(width: AppSpacing.md),
+                              Text('Checking watches...'),
                             ],
                           ),
                         ),
@@ -521,10 +508,8 @@ class _DashboardTabState extends State<DashboardTab> {
 
   List<Widget> _buildWatchList() {
     if (_selectedDomainId != null) {
-      // Single domain view: just list the watches
-      return _filteredWatches.map((w) => _buildWatchCard(w)).toList();
+      return _filteredWatches.map((w) => _WatchCard(w: w)).toList();
     } else {
-      // All domains view: group watches by domain
       final Map<int, List<Watch>> groupedWatches = {};
       for (var watch in _filteredWatches) {
         groupedWatches.putIfAbsent(watch.domainId, () => []).add(watch);
@@ -536,69 +521,128 @@ class _DashboardTabState extends State<DashboardTab> {
         if (domainWatches != null && domainWatches.isNotEmpty) {
           widgets.add(
             Padding(
-              padding: const EdgeInsets.only(top: 16.0, bottom: 8.0, left: 4.0),
+              padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.xs, left: 4),
               child: Text(
                 domain.name,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondaryLight,
+                ),
               ),
             ),
           );
-          widgets.addAll(domainWatches.map((w) => _buildWatchCard(w)));
+          widgets.addAll(domainWatches.map((w) => _WatchCard(w: w)));
         }
       }
       return widgets;
     }
   }
+}
 
-  Widget _buildWatchCard(Watch watch) {
-    final hasError = watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300);
-    final isNeverChecked = watch.lastStatus == null;
+class _WatchCard extends StatelessWidget {
+  final Watch w;
+
+  const _WatchCard({required this.w});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = w.lastStatus != null && (w.lastStatus! < 200 || w.lastStatus! >= 300);
+    final isNeverChecked = w.lastStatus == null;
 
     Color statusColor = Colors.grey;
     IconData statusIcon = Icons.help_outline;
     if (!isNeverChecked) {
-      statusColor = hasError ? Colors.red : Colors.green;
+      statusColor = hasError ? AppColors.danger : AppColors.success;
       statusIcon = hasError ? Icons.error : Icons.check_circle;
 
-      if (hasError && watch.consecutiveFails > 0 && watch.consecutiveFails < 3) {
-        statusColor = Colors.orange;
+      if (hasError && w.consecutiveFails > 0 && w.consecutiveFails < 3) {
+        statusColor = AppColors.warning;
         statusIcon = Icons.warning;
       }
     }
 
     return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: ListTile(
         leading: Icon(statusIcon, color: statusColor, size: 36),
-        title: Text(watch.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(watch.url, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(w.url, maxLines: 1, overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.chevron_right),
         onTap: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => WatchDetailScreen(watch: watch),
+              builder: (context) => WatchDetailScreen(watch: w),
             ),
           );
-          _loadData();
+          // Refresh handled by caller
         },
       ),
     );
   }
+}
 
-  Widget _buildSummaryCard(String title, String value, Color color) {
+class _SummaryRow extends StatelessWidget {
+  final String total;
+  final String active;
+  final String errors;
+  final bool hasErrors;
+
+  const _SummaryRow({
+    required this.total,
+    required this.active,
+    required this.errors,
+    required this.hasErrors,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _SummaryCard(title: 'Total', value: total, color: AppColors.primary)),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(child: _SummaryCard(title: 'Active', value: active, color: AppColors.success)),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          child: _SummaryCard(
+            title: 'Errors',
+            value: errors,
+            color: hasErrors ? AppColors.danger : AppColors.textSecondaryLight,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final Color color;
+
+  const _SummaryCard({
+    required this.title,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
-      elevation: 4,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.xs),
         child: Column(
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               value,
               style: TextStyle(

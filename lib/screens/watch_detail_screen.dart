@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
 import '../models/watch.dart';
 import '../models/watch_log.dart';
@@ -63,6 +65,10 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasError = _currentWatch.lastStatus != null &&
+        (_currentWatch.lastStatus! < 200 || _currentWatch.lastStatus! >= 300);
+    final statusColor = hasError ? AppColors.danger : AppColors.success;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_currentWatch.name),
@@ -83,153 +89,128 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SwitchListTile(
-                    title: const Text('Monitoring Active', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Pause or resume monitoring for this watch'),
-                    value: _currentWatch.isActive,
-                    onChanged: _toggleIsActive,
-                    contentPadding: EdgeInsets.zero,
+                  Card(
+                    child: SwitchListTile(
+                      title: const Text('Monitoring Active', style: TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: const Text('Pause or resume monitoring for this watch'),
+                      value: _currentWatch.isActive,
+                      onChanged: _toggleIsActive,
+                      secondary: Icon(
+                        _currentWatch.isActive ? Icons.play_circle : Icons.pause_circle,
+                        color: _currentWatch.isActive ? AppColors.success : AppColors.textSecondaryLight,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    ),
                   ),
-                  const Divider(),
-                  _buildDetailRow('URL', _currentWatch.url),
-                  _buildDetailRow('Interval', '${_currentWatch.intervalMinutes} minutes'),
-                  _buildDetailRow('Expected Status', '200-299'),
-                  _buildDetailRow('Keyword (Optional)', _currentWatch.keyword ?? 'None'),
-                  _buildDetailRow(
-                      'Last Status',
-                      _currentWatch.lastStatus == null
-                          ? 'Never checked'
-                          : (_currentWatch.lastStatus == -1 ? 'Keyword Failed (-1)' : _currentWatch.lastStatus.toString()),
-                      color: _currentWatch.lastStatus == null
-                          ? Colors.grey
-                          : ((_currentWatch.lastStatus! >= 200 && _currentWatch.lastStatus! < 300) ? Colors.green : Colors.red)),
-                  _buildDetailRow(
-                      'Last Checked',
-                      _currentWatch.lastCheckTime != null
-                          ? DateFormat('yyyy-MM-dd HH:mm').format(_currentWatch.lastCheckTime!)
-                          : 'Never'),
-                  const SizedBox(height: 24),
-                  const Text(
+                  const SizedBox(height: AppSpacing.md),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Column(
+                        children: [
+                          _DetailRow(label: 'URL', value: _currentWatch.url),
+                          _DetailRow(label: 'Interval', value: '${_currentWatch.intervalMinutes} minutes'),
+                          _DetailRow(label: 'Expected Status', value: '200-299'),
+                          _DetailRow(label: 'Keyword (Optional)', value: _currentWatch.keyword ?? 'None'),
+                          _DetailRow(
+                            label: 'Last Status',
+                            value: _currentWatch.lastStatus == null
+                                ? 'Never checked'
+                                : (_currentWatch.lastStatus == -1
+                                    ? 'Keyword Failed (-1)'
+                                    : _currentWatch.lastStatus.toString()),
+                            valueColor: statusColor,
+                          ),
+                          _DetailRow(
+                            label: 'Last Checked',
+                            value: _currentWatch.lastCheckTime != null
+                                ? DateFormat('yyyy-MM-dd HH:mm').format(_currentWatch.lastCheckTime!)
+                                : 'Never',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
                     '31-Day History',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 16),
-                  _buildHistoryChart(),
-                  const SizedBox(height: 24),
-                  const Text(
+                  const SizedBox(height: AppSpacing.md),
+                  _HistoryChart(logs: _logs),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
                     'Response Time (Last 50)',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 16),
-                  _buildResponseTimeChart(),
-                  const SizedBox(height: 24),
-                  const Text(
+                  const SizedBox(height: AppSpacing.md),
+                  _ResponseTimeChart(logs: _logs),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
                     'Recent Logs',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 8),
-                  _buildLogList(),
+                  const SizedBox(height: AppSpacing.xs),
+                  _LogList(logs: _logs),
                 ],
               ),
             ),
     );
   }
+}
 
-  Widget _buildResponseTimeChart() {
-    final recentLogsWithTime = _logs.where((l) => l.responseTimeMs != null).toList().reversed.take(50).toList().reversed.toList();
-    if (recentLogsWithTime.isEmpty) {
-      return const Text('No response time data available yet.');
-    }
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
 
-    final List<FlSpot> spots = [];
-    double maxTime = 0;
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
-    for (int i = 0; i < recentLogsWithTime.length; i++) {
-      final timeMs = recentLogsWithTime[i].responseTimeMs!.toDouble();
-      if (timeMs > maxTime) maxTime = timeMs;
-      spots.add(FlSpot(i.toDouble(), timeMs));
-    }
-
-    return SizedBox(
-      height: 200,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 16.0),
-        child: LineChart(
-          LineChartData(
-            gridData: FlGridData(show: true),
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 40,
-                  getTitlesWidget: (value, meta) {
-                    if (value == 0) return const Text('');
-                    return Text('${value.toInt()}ms', style: const TextStyle(fontSize: 10));
-                  },
-                ),
-              ),
-            ),
-            borderData: FlBorderData(show: true),
-            minX: 0,
-            maxX: spots.isNotEmpty ? spots.last.x : 0,
-            minY: 0,
-            maxY: maxTime * 1.2, // Give it some headroom
-            lineBarsData: [
-              LineChartBarData(
-                spots: spots,
-                isCurved: true,
-                color: Colors.blue,
-                barWidth: 2,
-                dotData: FlDotData(show: false),
-                belowBarData: BarAreaData(
-                  show: true,
-                  color: Colors.blue.withValues(alpha: 0.1),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, {Color? color}) {
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(fontSize: 16, color: color),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: valueColor),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildHistoryChart() {
-    // Group logs by day
+class _HistoryChart extends StatelessWidget {
+  final List<WatchLog> logs;
+
+  const _HistoryChart({required this.logs});
+
+  @override
+  Widget build(BuildContext context) {
     final Map<DateTime, bool> dailyStatus = {};
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     for (int i = 0; i < 31; i++) {
       final day = today.subtract(Duration(days: 30 - i));
-      dailyStatus[day] = true; // Assume success initially, or absent if no logs
+      dailyStatus[day] = true;
     }
 
     // A day is considered failure if there's any failure log in that day. If skipped, record as skipped.
@@ -259,7 +240,9 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
           final hasLogs = actualDailyStatus.containsKey(day);
           final status = actualDailyStatus[day];
 
-          Color color = Colors.grey[300]!; // No data
+          Color color = Theme.of(context).brightness == Brightness.dark
+              ? AppColors.borderDark
+              : AppColors.borderLight;
           if (hasLogs) {
             if (status == 'success') {
                 color = Colors.green;
@@ -285,14 +268,96 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
       ),
     );
   }
+}
 
-  Widget _buildLogList() {
-    if (_logs.isEmpty) {
+class _ResponseTimeChart extends StatelessWidget {
+  final List<WatchLog> logs;
+
+  const _ResponseTimeChart({required this.logs});
+
+  @override
+  Widget build(BuildContext context) {
+    final recentLogsWithTime = logs.where((l) => l.responseTimeMs != null)
+        .toList().reversed.take(50).toList().reversed.toList();
+
+    if (recentLogsWithTime.isEmpty) {
+      return const Text('No response time data available yet.');
+    }
+
+    final List<FlSpot> spots = [];
+    double maxTime = 0;
+
+    for (int i = 0; i < recentLogsWithTime.length; i++) {
+      final timeMs = recentLogsWithTime[i].responseTimeMs!.toDouble();
+      if (timeMs > maxTime) maxTime = timeMs;
+      spots.add(FlSpot(i.toDouble(), timeMs));
+    }
+
+    return SizedBox(
+      height: 200,
+      child: Padding(
+        padding: const EdgeInsets.only(right: AppSpacing.md),
+        child: LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              getDrawingHorizontalLine: (value) => FlLine(
+                color: Theme.of(context).dividerTheme.color ?? Colors.grey[300]!,
+                strokeWidth: 0.5,
+              ),
+            ),
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 40,
+                  getTitlesWidget: (value, meta) {
+                    if (value == 0) return const Text('');
+                    return Text('${value.toInt()}ms', style: const TextStyle(fontSize: 10));
+                  },
+                ),
+              ),
+            ),
+            borderData: FlBorderData(show: true),
+            minX: 0,
+            maxX: spots.isNotEmpty ? spots.last.x : 0,
+            minY: 0,
+            maxY: maxTime * 1.2,
+            lineBarsData: [
+              LineChartBarData(
+                spots: spots,
+                isCurved: true,
+                color: AppColors.primary,
+                barWidth: 2,
+                dotData: FlDotData(show: false),
+                belowBarData: BarAreaData(
+                  show: true,
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogList extends StatelessWidget {
+  final List<WatchLog> logs;
+
+  const _LogList({required this.logs});
+
+  @override
+  Widget build(BuildContext context) {
+    if (logs.isEmpty) {
       return const Text('No logs available.');
     }
 
-    // Show only the latest 50 logs reversed
-    final recentLogs = _logs.reversed.take(50).toList();
+    final recentLogs = logs.reversed.take(50).toList();
 
     return ListView.builder(
       shrinkWrap: true,

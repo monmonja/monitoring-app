@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
 import '../models/domain.dart';
 
@@ -62,24 +63,36 @@ class _AddEditDomainScreenState extends State<AddEditDomainScreen> {
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             children: [
               TextFormField(
                 initialValue: name,
-                decoration: const InputDecoration(labelText: 'Name (e.g. My Site)'),
+                decoration: const InputDecoration(
+                  labelText: 'Name',
+                  hintText: 'e.g. My Site',
+                ),
                 validator: (value) =>
                     value != null && value.isEmpty ? 'Name cannot be empty' : null,
                 onSaved: (value) => name = value!,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.md),
               TextFormField(
                 initialValue: url,
-                decoration: const InputDecoration(labelText: 'Base URL (e.g. https://example.com)'),
+                decoration: const InputDecoration(
+                  labelText: 'Base URL',
+                  hintText: 'e.g. https://example.com',
+                ),
                 validator: (value) =>
                     value != null && value.isEmpty ? 'URL cannot be empty' : null,
                 onSaved: (value) => url = value!,
                 keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              ElevatedButton.icon(
+                onPressed: _saveDomain,
+                icon: const Icon(Icons.save),
+                label: const Text('Save Domain'),
               ),
             ],
           ),
