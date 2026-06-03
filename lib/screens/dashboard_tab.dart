@@ -397,32 +397,15 @@ class _DashboardTabState extends State<DashboardTab> {
                   child: ListView(
                     padding: const EdgeInsets.all(AppSpacing.md),
                     children: [
+                      Center(
+                        child: const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
                       _SummaryRow(
                         total: totalWatches.toString(),
                         active: activeWatches.toString(),
                         errors: errorWatches.toString(),
                         hasErrors: errorWatches > 0,
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: ['All', 'Down Only', 'Warnings'].map((filter) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: AppSpacing.xs),
-                              child: ChoiceChip(
-                                label: Text(filter),
-                                selected: _currentFilter == filter,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    _currentFilter = filter;
-                                  });
-                                  _applyFilters();
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ),
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Row(
@@ -454,9 +437,6 @@ class _DashboardTabState extends State<DashboardTab> {
                         )
                       else
                         ..._buildWatchList(),
-                      const SizedBox(height: AppSpacing.sm),
-                      const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
-                      const SizedBox(height: AppSpacing.sm),
                     ],
                   ),
                 ),

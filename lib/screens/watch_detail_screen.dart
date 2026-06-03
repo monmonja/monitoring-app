@@ -94,6 +94,10 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Center(
+                    child: const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   Card(
                     child: SwitchListTile(
                       title: const Text('Monitoring Active', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -157,9 +161,6 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   _LogList(logs: _logs),
-                  const SizedBox(height: AppSpacing.md),
-                  const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
-                  const SizedBox(height: AppSpacing.md),
                 ],
               ),
             ),

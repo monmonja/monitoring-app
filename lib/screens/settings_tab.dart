@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
-import '../core/theme/app_colors.dart';
 import '../core/theme/theme_manager.dart';
 import '../database_helper.dart';
 
@@ -102,8 +101,6 @@ class _SettingsTabState extends State<SettingsTab> {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    final isDark = widget.themeManager.isDarkMode;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -156,22 +153,3 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}

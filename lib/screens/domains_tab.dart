@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/ad_banner.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
@@ -53,7 +54,14 @@ class _DomainsTabState extends State<DomainsTab> {
           }
 
           final domains = snapshot.data!;
-          return ListView.builder(
+          return Column(
+            children: [
+              const Center(
+                child: AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Expanded(
+                child: ListView.builder(
             itemCount: domains.length,
             itemBuilder: (context, index) {
               final domain = domains[index];
@@ -93,6 +101,9 @@ class _DomainsTabState extends State<DomainsTab> {
                 ),
               );
             },
+          ),
+        ),
+            ],
           );
         },
       ),
