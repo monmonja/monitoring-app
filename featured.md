@@ -4,7 +4,7 @@ This is a Flutter application designed to help users monitor websites by managin
 
 ## Key Features
 
-*   **Dashboard:** Provides a quick overview of all active watches and their current status (e.g., Up, Down, Error).
+*   **Dashboard:** Provides a quick overview of all active watches and their current status (e.g., Up, Down, Warning, Error). A summary row shows counts for Total, Active, Warnings, and Errors, and filter chips let users focus on All, Down Only, or Warnings.
 *   **Domains Management:** Allows users to add, edit, and manage root domains.
 *   **Watches:** Users can create, edit, and delete scheduled monitoring tasks (watches) for specific URLs. Each watch can be configured with:
     *   An expected HTTP status code (e.g., 200).
@@ -15,7 +15,10 @@ This is a Flutter application designed to help users monitor websites by managin
 *   **SSL Expiry Alerts:** The background service checks SSL certificates for HTTPS URLs and can be configured to alert the user if a certificate is expiring within 14 days.
 *   **Reliable Pure-Mobile Background Monitoring:** Using `flutter_background_service`, the app reliably checks configured URLs continuously while running in the background without relying on external servers.
 *   **Smart Network Retries:** To prevent false positives and alert fatigue from flaky networks, the app only flags a watch as down and sends a notification after 3 consecutive failures.
-*   **Grouped Notifications:** Alerts are smartly grouped into a summary notification to keep the user's notification tray clean.
+*   **Manual Refresh with Notifications:** The dashboard's pull-to-refresh re-checks all watches and fires the same alert notifications as the background service, so manually triggered checks are just as informative.
+*   **Grouped Notifications:** Alerts are smartly grouped into a summary notification to keep the user's notification tray clean. A shared `NotificationHelper` keeps the channel and alert logic consistent between manual and background checks.
+*   **Alert Detail View:** Tapping any entry in a watch's Recent Logs opens a bottom sheet showing the full alert breakdown — alert type (PASS / FAILED / SKIPPED), timestamp, status code, response time, and the complete error message in a selectable, scrollable container.
+*   **Watch Detail Screen:** Each watch has a dedicated screen with a pinned, centered ad banner at the top, monitoring controls, configuration summary, 31-day history strip, response-time line chart, and a tappable list of recent logs.
 *   **Logs, Visuals, & History:** The app tracks the history of all status checks, logging response times, status codes, and error messages. Visual line charts (`fl_chart`) display response times over the last 50 checks. Old logs are automatically cleaned up after 31 days using `VACUUM` for optimized SQLite database performance.
 *   **Uptime Status Sharing:** Users can export a clean, text-based summary of their current system uptime directly from the dashboard using `share_plus`.
 *   **Home Screen Widget:** A convenient native Android home screen widget displays a quick summary of the monitoring status (e.g., how many sites are currently DOWN).
