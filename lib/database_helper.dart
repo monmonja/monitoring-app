@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/domain.dart';
 import 'models/watch.dart';
@@ -25,8 +25,8 @@ class DatabaseHelper {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    // Bumping version to 7 for wifiOnly
-    return await openDatabase(path, version: 7, onCreate: _createDB, onUpgrade: _upgradeDB);
+    // Bumping version to 8 for uptime cache
+    return await openDatabase(path, version: 8, onCreate: _createDB, onUpgrade: _upgradeDB);
   }
 
   Future _createDB(Database db, int version) async {
@@ -65,6 +65,8 @@ CREATE TABLE watches (
   httpHeaders TEXT,
   httpBody TEXT,
   wifiOnly BOOLEAN NOT NULL DEFAULT 1,
+  uptime7Days REAL,
+  uptime30Days REAL,
   FOREIGN KEY (domainId) REFERENCES domains (id) ON DELETE CASCADE
 )
 ''');
@@ -154,6 +156,10 @@ CREATE TABLE domains (
       // Add index for fast query execution
       await db.execute('CREATE INDEX IF NOT EXISTS idx_watch_logs_timestamp ON watch_logs (timestamp)');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_watch_logs_watchId ON watch_logs (watchId)');
+    }
+    if (oldVersion < 8) {
+      await db.execute('ALTER TABLE watches ADD COLUMN uptime7Days REAL');
+      await db.execute('ALTER TABLE watches ADD COLUMN uptime30Days REAL');
     }
   }
 
@@ -331,6 +337,111 @@ CREATE TABLE domains (
     }
     return count;
   }
+  Future<void> calculateAndSaveUptime(int watchId) async {
+    final watch = await readWatch(watchId);
+    if (watch == null) return;
+
+    final logs = await readWatchLogs(watchId);
+    if (logs.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final includeSkipped = prefs.getBool('include_skipped_in_uptime') ?? false;
+
+    final now = DateTime.now();
+
+    double? calcUptime(int days) {
+      final periodStart = now.subtract(Duration(days: days));
+
+      // Filter logs to those relevant to the period.
+      // We also need the state right before the period starts.
+      WatchLog? lastLogBeforePeriod;
+      List<WatchLog> periodLogs = [];
+
+      for (var log in logs) {
+        if (log.timestamp.isBefore(periodStart)) {
+          lastLogBeforePeriod = log;
+        } else {
+          periodLogs.add(log);
+        }
+      }
+
+      // If there are no logs at all before or during the period, return null
+      if (lastLogBeforePeriod == null && periodLogs.isEmpty) {
+        return null;
+      }
+
+      // Start calculating from either periodStart or the first log's time
+      DateTime calculationStartTime = periodStart;
+      if (lastLogBeforePeriod == null && periodLogs.isNotEmpty) {
+        calculationStartTime = periodLogs.first.timestamp;
+      }
+
+      int totalDurationMs = now.difference(calculationStartTime).inMilliseconds;
+      if (totalDurationMs <= 0) return null;
+
+      int uptimeDurationMs = 0;
+
+      // Determine initial state
+      bool isCurrentlyUp = true;
+      if (lastLogBeforePeriod != null) {
+        bool isSkipped = !lastLogBeforePeriod.status && lastLogBeforePeriod.errorMessage != null && lastLogBeforePeriod.errorMessage!.startsWith('Skipped:');
+        if (isSkipped) {
+           isCurrentlyUp = !includeSkipped;
+        } else {
+           isCurrentlyUp = lastLogBeforePeriod.status;
+        }
+      } else if (periodLogs.isNotEmpty) {
+        bool isSkipped = !periodLogs.first.status && periodLogs.first.errorMessage != null && periodLogs.first.errorMessage!.startsWith('Skipped:');
+        if (isSkipped) {
+           isCurrentlyUp = !includeSkipped;
+        } else {
+           isCurrentlyUp = periodLogs.first.status;
+        }
+      }
+
+      DateTime lastStateChangeTime = calculationStartTime;
+
+      for (var log in periodLogs) {
+        bool isSkipped = !log.status && log.errorMessage != null && log.errorMessage!.startsWith('Skipped:');
+        bool newUpState;
+
+        if (isSkipped) {
+            if (includeSkipped) {
+                newUpState = false; // It's downtime
+            } else {
+                continue; // Ignore skipped check, state continues as it was
+            }
+        } else {
+            newUpState = log.status;
+        }
+
+        if (newUpState != isCurrentlyUp) {
+            if (isCurrentlyUp) {
+                uptimeDurationMs += log.timestamp.difference(lastStateChangeTime).inMilliseconds;
+            }
+            isCurrentlyUp = newUpState;
+            lastStateChangeTime = log.timestamp;
+        }
+      }
+
+      // Add final segment to now
+      if (isCurrentlyUp) {
+          uptimeDurationMs += now.difference(lastStateChangeTime).inMilliseconds;
+      }
+
+      return (uptimeDurationMs / totalDurationMs) * 100.0;
+    }
+
+    final uptime7 = calcUptime(7);
+    final uptime30 = calcUptime(30);
+
+    final updatedWatch = watch.copyWith(
+      uptime7Days: uptime7,
+      uptime30Days: uptime30,
+    );
+    await update(updatedWatch);
+  }
+
   Future close() async {
     final db = await instance.database;
     db.close();

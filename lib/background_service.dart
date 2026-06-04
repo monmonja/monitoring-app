@@ -225,6 +225,8 @@ void onStart(ServiceInstance service) async {
             errorMessage: errorMessage.isNotEmpty ? errorMessage : null,
             responseTimeMs: responseTimeMs,
           ));
+          // Recalculate uptime
+          await dbHelper.calculateAndSaveUptime(watch.id!);
         }
 
         // Clean up old logs (older than 31 days)
