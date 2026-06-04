@@ -7,35 +7,17 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/notification_helper.dart';
 import 'database_helper.dart';
 import 'models/watch_log.dart';
 
 Future<void> initializeService() async {
   final service = FlutterBackgroundService();
 
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'watch_alert_channel', // id
-    'Watch Alerts', // name
-    description: 'Alerts when a watch fails its check', // description
-    importance: Importance.max, // importance must be at low or higher level
-  );
-
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  if (Platform.isAndroid) {
-    final androidPlugin = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-
-    await androidPlugin?.createNotificationChannel(channel);
-
-    await androidPlugin?.requestNotificationsPermission();
-  }
+  await NotificationHelper.init();
 
   await service.configure(
     androidConfiguration: AndroidConfiguration(
@@ -45,7 +27,7 @@ Future<void> initializeService() async {
       notificationChannelId: 'watch_alert_channel',
       initialNotificationTitle: 'Watch App Service',
       initialNotificationContent: 'Monitoring watches...',
-      foregroundServiceNotificationId: 888,
+      foregroundServiceNotificationId: NotificationHelper.foregroundServiceId,
     ),
     iosConfiguration: IosConfiguration(
       autoStart: true,
@@ -67,15 +49,7 @@ void onStart(ServiceInstance service) async {
 
   final dbHelper = DatabaseHelper.instance;
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-  const InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-  );
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  await NotificationHelper.init();
 
   final dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 10),
@@ -258,46 +232,10 @@ void onStart(ServiceInstance service) async {
         await dbHelper.deleteOldWatchLogs(thirtyOneDaysAgo);
 
         if (shouldAlert) {
-          // Show notification
-          const AndroidNotificationDetails androidPlatformChannelSpecifics =
-              AndroidNotificationDetails(
-            'watch_alert_channel',
-            'Watch Alerts',
-            channelDescription: 'Alerts when a watch fails its check',
-            importance: Importance.max,
-            priority: Priority.high,
-            groupKey: 'watch_alert_group',
-          );
-          const NotificationDetails platformChannelSpecifics =
-              NotificationDetails(android: androidPlatformChannelSpecifics);
-
-          await flutterLocalNotificationsPlugin.show(
-            watch.id ?? 0,
-            'Watch Alert: ${watch.name}',
-            errorMessage,
-            platformChannelSpecifics,
-          );
-
-          // Show Group Summary
-          const AndroidNotificationDetails summaryAndroidPlatformChannelSpecifics =
-              AndroidNotificationDetails(
-            'watch_alert_channel',
-            'Watch Alerts',
-            channelDescription: 'Alerts when a watch fails its check',
-            importance: Importance.max,
-            priority: Priority.high,
-            groupKey: 'watch_alert_group',
-            setAsGroupSummary: true,
-          );
-
-          const NotificationDetails summaryPlatformChannelSpecifics =
-              NotificationDetails(android: summaryAndroidPlatformChannelSpecifics);
-
-          await flutterLocalNotificationsPlugin.show(
-            0, // Group Summary ID
-            'Watch Alerts Summary',
-            'Multiple watches are experiencing issues.',
-            summaryPlatformChannelSpecifics,
+          await NotificationHelper.showWatchAlert(
+            watch: watch,
+            errorMessage: errorMessage,
+            statusCode: currentStatus,
           );
         }
       }

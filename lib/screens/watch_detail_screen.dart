@@ -89,80 +89,88 @@ class _WatchDetailScreenState extends State<WatchDetailScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: Center(
                     child: const AdBanner(adUnitId: 'ca-app-pub-3940256099942544/6300978111'),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Card(
-                    child: SwitchListTile(
-                      title: const Text('Monitoring Active', style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Pause or resume monitoring for this watch'),
-                      value: _currentWatch.isActive,
-                      onChanged: _toggleIsActive,
-                      secondary: Icon(
-                        _currentWatch.isActive ? Icons.play_circle : Icons.pause_circle,
-                        color: _currentWatch.isActive ? AppColors.success : AppColors.textSecondaryLight,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Card(
+                          child: SwitchListTile(
+                            title: const Text('Monitoring Active', style: TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: const Text('Pause or resume monitoring for this watch'),
+                            value: _currentWatch.isActive,
+                            onChanged: _toggleIsActive,
+                            secondary: Icon(
+                              _currentWatch.isActive ? Icons.play_circle : Icons.pause_circle,
+                              color: _currentWatch.isActive ? AppColors.success : AppColors.textSecondaryLight,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Column(
+                              children: [
+                                _DetailRow(label: 'URL', value: _currentWatch.url),
+                                _DetailRow(label: 'Interval', value: '${_currentWatch.intervalMinutes} minutes'),
+                                _DetailRow(label: 'Expected Status', value: '200-299'),
+                                _DetailRow(label: 'Keyword (Optional)', value: _currentWatch.keyword ?? 'None'),
+                                _DetailRow(
+                                  label: 'Last Status',
+                                  value: _currentWatch.lastStatus == null
+                                      ? 'Never checked'
+                                      : (_currentWatch.lastStatus == -1
+                                          ? 'Keyword Failed (-1)'
+                                          : _currentWatch.lastStatus.toString()),
+                                  valueColor: statusColor,
+                                ),
+                                _DetailRow(
+                                  label: 'Last Checked',
+                                  value: _currentWatch.lastCheckTime != null
+                                      ? DateFormat('yyyy-MM-dd HH:mm').format(_currentWatch.lastCheckTime!)
+                                      : 'Never',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          '31-Day History',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _HistoryChart(logs: _logs),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Response Time (Last 50)',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _ResponseTimeChart(logs: _logs),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Recent Logs',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        _LogList(logs: _logs),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: Column(
-                        children: [
-                          _DetailRow(label: 'URL', value: _currentWatch.url),
-                          _DetailRow(label: 'Interval', value: '${_currentWatch.intervalMinutes} minutes'),
-                          _DetailRow(label: 'Expected Status', value: '200-299'),
-                          _DetailRow(label: 'Keyword (Optional)', value: _currentWatch.keyword ?? 'None'),
-                          _DetailRow(
-                            label: 'Last Status',
-                            value: _currentWatch.lastStatus == null
-                                ? 'Never checked'
-                                : (_currentWatch.lastStatus == -1
-                                    ? 'Keyword Failed (-1)'
-                                    : _currentWatch.lastStatus.toString()),
-                            valueColor: statusColor,
-                          ),
-                          _DetailRow(
-                            label: 'Last Checked',
-                            value: _currentWatch.lastCheckTime != null
-                                ? DateFormat('yyyy-MM-dd HH:mm').format(_currentWatch.lastCheckTime!)
-                                : 'Never',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    '31-Day History',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _HistoryChart(logs: _logs),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    'Response Time (Last 50)',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _ResponseTimeChart(logs: _logs),
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    'Recent Logs',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  _LogList(logs: _logs),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
@@ -375,7 +383,7 @@ class _LogList extends StatelessWidget {
           dense: true,
           leading: Icon(
             log.status ? Icons.check_circle : (isSkipped ? Icons.skip_next : Icons.error),
-            color: log.status ? Colors.green : (isSkipped ? Colors.orange : Colors.red),
+            color: log.status ? AppColors.success : (isSkipped ? AppColors.warning : AppColors.danger),
           ),
           title: Text(DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp)),
           subtitle: Text(
@@ -385,6 +393,141 @@ class _LogList extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          trailing: const Icon(Icons.chevron_right, size: 16),
+          onTap: () => _showLogDetails(context, log),
+        );
+      },
+    );
+  }
+
+  void _showLogDetails(BuildContext context, WatchLog log) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = isDark ? AppColors.cardDark : AppColors.cardLight;
+
+    bool isSkipped = !log.status &&
+        log.errorMessage != null &&
+        log.errorMessage!.startsWith('Skipped:');
+
+    final String alertLabel;
+    final Color alertColor;
+    final IconData alertIcon;
+    if (log.status) {
+      alertLabel = 'PASS';
+      alertColor = AppColors.success;
+      alertIcon = Icons.check_circle;
+    } else if (isSkipped) {
+      alertLabel = 'SKIPPED';
+      alertColor = AppColors.warning;
+      alertIcon = Icons.skip_next;
+    } else {
+      alertLabel = 'FAILED';
+      alertColor = AppColors.danger;
+      alertIcon = Icons.error;
+    }
+
+    String formatStatusCode(int? code) {
+      if (code == null) return 'No response';
+      if (code == -1) return '-1 (Keyword check failed)';
+      return code.toString();
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.gray400,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Icon(alertIcon, color: alertColor, size: 32),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        alertLabel,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: alertColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Card(
+                    color: isDark ? AppColors.surfaceDark : AppColors.gray50,
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _DetailRow(
+                            label: 'Timestamp',
+                            value: DateFormat('yyyy-MM-dd HH:mm:ss').format(log.timestamp),
+                          ),
+                          _DetailRow(
+                            label: 'Status Code',
+                            value: formatStatusCode(log.statusCode),
+                            valueColor: log.status ? AppColors.success : AppColors.danger,
+                          ),
+                          _DetailRow(
+                            label: 'Response Time',
+                            value: log.responseTimeMs != null ? '${log.responseTimeMs} ms' : 'N/A',
+                          ),
+                          if (log.errorMessage != null && log.errorMessage!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              isSkipped ? 'Reason' : 'Error Details',
+                              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              decoration: BoxDecoration(
+                                color: alertColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: alertColor.withValues(alpha: 0.3)),
+                              ),
+                              child: SelectableText(
+                                log.errorMessage!,
+                                style: theme.textTheme.bodyMedium?.copyWith(color: alertColor),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ),
+            );
+          },
         );
       },
     );

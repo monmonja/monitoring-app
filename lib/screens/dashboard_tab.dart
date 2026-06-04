@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../core/ad_banner.dart';
+import '../core/notification_helper.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
 import '../database_helper.dart';
@@ -30,6 +31,7 @@ class _DashboardTabState extends State<DashboardTab> {
   int totalWatches = 0;
   int activeWatches = 0;
   int errorWatches = 0;
+  int warningWatches = 0;
   bool isLoading = true;
   bool _isManualChecking = false;
   bool _hasCheckedForDomains = false;
@@ -93,11 +95,16 @@ class _DashboardTabState extends State<DashboardTab> {
 
     int errors = 0;
     int active = 0;
+    int warnings = 0;
     for (var watch in watches) {
       if (watch.isActive) {
         active++;
         if (watch.lastStatus != null && (watch.lastStatus! < 200 || watch.lastStatus! >= 300)) {
-          errors++;
+          if (watch.consecutiveFails > 0 && watch.consecutiveFails < 3) {
+            warnings++;
+          } else {
+            errors++;
+          }
         }
       }
     }
@@ -108,6 +115,7 @@ class _DashboardTabState extends State<DashboardTab> {
       totalWatches = watches.length;
       activeWatches = active;
       errorWatches = errors;
+      warningWatches = warnings;
       isLoading = false;
     });
 
@@ -271,6 +279,14 @@ class _DashboardTabState extends State<DashboardTab> {
         ));
       }
 
+      if (hasError && updatedFails >= 3) {
+        await NotificationHelper.showWatchAlert(
+          watch: updatedWatch,
+          errorMessage: errorMessage.isNotEmpty ? errorMessage : 'Check failed.',
+          statusCode: currentStatus,
+        );
+      }
+
       if (mounted) {
         setState(() {
           int index = _filteredWatches.indexWhere((w) => w.id == watch.id);
@@ -404,8 +420,10 @@ class _DashboardTabState extends State<DashboardTab> {
                       _SummaryRow(
                         total: totalWatches.toString(),
                         active: activeWatches.toString(),
+                        warnings: warningWatches.toString(),
                         errors: errorWatches.toString(),
                         hasErrors: errorWatches > 0,
+                        hasWarnings: warningWatches > 0,
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Row(
@@ -428,6 +446,16 @@ class _DashboardTabState extends State<DashboardTab> {
                               label: const Text('Stop', style: TextStyle(color: AppColors.danger)),
                             ),
                         ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      _FilterChipsRow(
+                        currentFilter: _currentFilter,
+                        onChanged: (filter) {
+                          setState(() {
+                            _currentFilter = filter;
+                          });
+                          _applyFilters();
+                        },
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       if (_filteredWatches.isEmpty)
@@ -569,14 +597,18 @@ class _WatchCard extends StatelessWidget {
 class _SummaryRow extends StatelessWidget {
   final String total;
   final String active;
+  final String warnings;
   final String errors;
   final bool hasErrors;
+  final bool hasWarnings;
 
   const _SummaryRow({
     required this.total,
     required this.active,
+    required this.warnings,
     required this.errors,
     required this.hasErrors,
+    required this.hasWarnings,
   });
 
   @override
@@ -584,9 +616,17 @@ class _SummaryRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: _SummaryCard(title: 'Total', value: total, color: AppColors.primary)),
-        const SizedBox(width: AppSpacing.xs),
+        const SizedBox(width: AppSpacing.xxs),
         Expanded(child: _SummaryCard(title: 'Active', value: active, color: AppColors.success)),
-        const SizedBox(width: AppSpacing.xs),
+        const SizedBox(width: AppSpacing.xxs),
+        Expanded(
+          child: _SummaryCard(
+            title: 'Warnings',
+            value: warnings,
+            color: hasWarnings ? AppColors.warning : AppColors.textSecondaryLight,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xxs),
         Expanded(
           child: _SummaryCard(
             title: 'Errors',
@@ -613,8 +653,9 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.xs),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm, horizontal: AppSpacing.xxs),
         child: Column(
           children: [
             Text(
@@ -630,13 +671,44 @@ class _SummaryCard extends StatelessWidget {
             Text(
               value,
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _FilterChipsRow extends StatelessWidget {
+  final String currentFilter;
+  final ValueChanged<String> onChanged;
+
+  const _FilterChipsRow({
+    required this.currentFilter,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final options = const ['All', 'Down Only', 'Warnings'];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: options.map((label) {
+          final isSelected = label == currentFilter;
+          return Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
+            child: ChoiceChip(
+              label: Text(label),
+              selected: isSelected,
+              onSelected: (_) => onChanged(label),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
