@@ -19,6 +19,7 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   double _batteryMultiplier = 1.0;
+  bool _includeSkippedInUptime = false;
   bool _isLoading = true;
 
   @override
@@ -31,6 +32,7 @@ class _SettingsTabState extends State<SettingsTab> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _batteryMultiplier = prefs.getDouble('battery_multiplier') ?? 1.0;
+      _includeSkippedInUptime = prefs.getBool('include_skipped_in_uptime') ?? false;
       _isLoading = false;
     });
   }
@@ -41,6 +43,22 @@ class _SettingsTabState extends State<SettingsTab> {
     setState(() {
       _batteryMultiplier = value;
     });
+  }
+
+  Future<void> _saveIncludeSkippedInUptime(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('include_skipped_in_uptime', value);
+    setState(() {
+      _includeSkippedInUptime = value;
+    });
+
+    // Recalculate for all watches when setting is changed
+    final watches = await DatabaseHelper.instance.readAllWatches();
+    for (var watch in watches) {
+      if (watch.id != null) {
+        await DatabaseHelper.instance.calculateAndSaveUptime(watch.id!);
+      }
+    }
   }
 
   Future<void> _exportData() async {
@@ -146,6 +164,18 @@ class _SettingsTabState extends State<SettingsTab> {
                 }
               },
             ),
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Monitoring & Calculation', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.calculate),
+            title: const Text('Include skipped checks in Uptime'),
+            subtitle: const Text('If enabled, checks skipped due to constraints (like Wi-Fi only) are counted as downtime. Otherwise, they are ignored in calculations.'),
+            value: _includeSkippedInUptime,
+            onChanged: _saveIncludeSkippedInUptime,
           ),
         ],
       ),

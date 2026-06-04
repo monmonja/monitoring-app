@@ -277,6 +277,7 @@ class _DashboardTabState extends State<DashboardTab> {
           errorMessage: errorMessage.isNotEmpty ? errorMessage : null,
           responseTimeMs: responseTimeMs,
         ));
+        await dbHelper.calculateAndSaveUptime(watch.id!);
       }
 
       if (hasError && updatedFails >= 3) {
@@ -574,12 +575,35 @@ class _WatchCard extends StatelessWidget {
       }
     }
 
+    String uptimeText = '';
+    if (w.uptime7Days != null || w.uptime30Days != null) {
+      final u7 = w.uptime7Days != null ? '${w.uptime7Days!.toStringAsFixed(2)}%' : 'N/A';
+      final u30 = w.uptime30Days != null ? '${w.uptime30Days!.toStringAsFixed(2)}%' : 'N/A';
+      uptimeText = 'Uptime: $u7 (7d) | $u30 (30d)';
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: ListTile(
         leading: Icon(statusIcon, color: statusColor, size: 36),
         title: Text(w.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(w.url, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(w.url, maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (uptimeText.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2.0),
+                child: Text(
+                  uptimeText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+          ],
+        ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () async {
           await Navigator.of(context).push(
