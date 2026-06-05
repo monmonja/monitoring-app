@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../core/ad_banner.dart';
+import '../core/connectivity_helper.dart';
 import '../core/notification_helper.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_spacing.dart';
@@ -163,11 +164,37 @@ class _DashboardTabState extends State<DashboardTab> {
     final dbHelper = DatabaseHelper.instance;
     final watchesToCheck = List<Watch>.from(_filteredWatches);
 
+    final isWifi = await ConnectivityHelper.isOnWifi();
+
     for (var i = 0; i < watchesToCheck.length; i++) {
       if (!_isManualChecking) break;
 
       final watch = watchesToCheck[i];
       if (!watch.isActive) continue;
+
+      if (watch.wifiOnly && !isWifi) {
+        final now = DateTime.now();
+        if (watch.id != null) {
+          await dbHelper.createWatchLog(WatchLog(
+            watchId: watch.id!,
+            timestamp: now,
+            status: false,
+            statusCode: 0,
+            errorMessage: 'Skipped: Not on Wi-Fi',
+            responseTimeMs: null,
+          ));
+        }
+        await dbHelper.update(watch.copyWith(lastCheckTime: now));
+        if (mounted) {
+          setState(() {
+            int index = _filteredWatches.indexWhere((w) => w.id == watch.id);
+            if (index != -1) {
+              _filteredWatches[index] = _filteredWatches[index].copyWith(lastCheckTime: now);
+            }
+          });
+        }
+        continue;
+      }
 
       bool hasError = false;
       String errorMessage = '';

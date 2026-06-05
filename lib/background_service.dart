@@ -10,6 +10,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/connectivity_helper.dart';
 import 'core/notification_helper.dart';
 import 'database_helper.dart';
 import 'models/watch_log.dart';
@@ -57,7 +58,6 @@ void onStart(ServiceInstance service) async {
   ));
 
   final battery = Battery();
-  final connectivity = Connectivity();
 
   // Run the check loop periodically
   Timer.periodic(const Duration(minutes: 1), (timer) async {
@@ -70,8 +70,12 @@ void onStart(ServiceInstance service) async {
       final batteryLevel = await battery.batteryLevel;
       final isBatterySaverOn = await battery.isInBatterySaveMode;
 
-      final connectivityResult = await connectivity.checkConnectivity();
-      final isWifi = connectivityResult.contains(ConnectivityResult.wifi);
+      final connectivityResult = await Connectivity().checkConnectivity();
+      final connectivitySaysWifi =
+          connectivityResult.contains(ConnectivityResult.wifi);
+      final isWifi = connectivitySaysWifi
+          ? await ConnectivityHelper.isOnWifi()
+          : false;
 
       // Apply power policy: multiply interval if battery is low or in power save mode
       bool applyPowerPolicy = batteryLevel < 20 || isBatterySaverOn;
