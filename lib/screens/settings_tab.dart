@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 
 import '../core/theme/theme_manager.dart';
+import '../core/user_agent_helper.dart';
 import '../database_helper.dart';
+import 'manage_user_agents_screen.dart';
 
 class SettingsTab extends StatefulWidget {
   final ThemeManager themeManager;
@@ -21,6 +23,7 @@ class _SettingsTabState extends State<SettingsTab> {
   double _batteryMultiplier = 1.0;
   bool _includeSkippedInUptime = false;
   bool _isLoading = true;
+  int _userAgentsCount = 0;
 
   @override
   void initState() {
@@ -30,9 +33,11 @@ class _SettingsTabState extends State<SettingsTab> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final agents = await UserAgentHelper.getUserAgents();
     setState(() {
       _batteryMultiplier = prefs.getDouble('battery_multiplier') ?? 1.0;
       _includeSkippedInUptime = prefs.getBool('include_skipped_in_uptime') ?? false;
+      _userAgentsCount = agents.length;
       _isLoading = false;
     });
   }
@@ -176,6 +181,81 @@ class _SettingsTabState extends State<SettingsTab> {
             subtitle: const Text('If enabled, checks skipped due to constraints (like Wi-Fi only) are counted as downtime. Otherwise, they are ignored in calculations.'),
             value: _includeSkippedInUptime,
             onChanged: _saveIncludeSkippedInUptime,
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text('Network', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.public),
+            title: const Text('Manage User Agents'),
+            subtitle: Text('$_userAgentsCount agents available'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ManageUserAgentsScreen()),
+                    );
+                    _loadSettings();
+                  },
+                  child: const Text('Edit'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final nameController = TextEditingController();
+                    final valueController = TextEditingController();
+                    final newAgent = await showDialog<UserAgentModel>(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text('Add User Agent'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: nameController,
+                                decoration: const InputDecoration(labelText: 'Name (e.g. My Phone)'),
+                              ),
+                              TextField(
+                                controller: valueController,
+                                decoration: const InputDecoration(labelText: 'User Agent String'),
+                                maxLines: 3,
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                final name = nameController.text.trim();
+                                final value = valueController.text.trim();
+                                if (name.isNotEmpty && value.isNotEmpty) {
+                                  Navigator.pop(context, UserAgentModel(name: name, value: value));
+                                }
+                              },
+                              child: const Text('Add'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+
+                    if (newAgent != null) {
+                      await UserAgentHelper.addAgent(newAgent);
+                      _loadSettings();
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            ),
           ),
         ],
       ),
