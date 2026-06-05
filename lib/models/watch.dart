@@ -1,6 +1,6 @@
 class WatchFields {
   static final List<String> values = [
-    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence, httpMethod, httpHeaders, httpBody, wifiOnly
+    id, domainId, name, url, intervalMinutes, expectedStatus, keyword, lastStatus, lastCheckTime, isActive, consecutiveFails, latencyThreshold, alertOnSslExpiry, checkKeywordAbsence, httpMethod, httpHeaders, httpBody, wifiOnly, uptime7Days, uptime30Days
   ];
 
   static const String id = 'id';
@@ -21,6 +21,8 @@ class WatchFields {
   static const String httpHeaders = 'httpHeaders';
   static const String httpBody = 'httpBody';
   static const String wifiOnly = 'wifiOnly';
+  static const String uptime7Days = 'uptime7Days';
+  static const String uptime30Days = 'uptime30Days';
 }
 
 class Watch {
@@ -42,6 +44,8 @@ class Watch {
   final String? httpHeaders;
   final String? httpBody;
   final bool wifiOnly;
+  final double? uptime7Days;
+  final double? uptime30Days;
 
   const Watch({
     this.id,
@@ -62,6 +66,8 @@ class Watch {
     this.httpHeaders,
     this.httpBody,
     this.wifiOnly = true,
+    this.uptime7Days,
+    this.uptime30Days,
   });
 
   Watch copyWith({
@@ -83,6 +89,8 @@ class Watch {
     String? httpHeaders,
     String? httpBody,
     bool? wifiOnly,
+    double? uptime7Days,
+    double? uptime30Days,
   }) {
     return Watch(
       id: id ?? this.id,
@@ -103,6 +111,8 @@ class Watch {
       httpHeaders: httpHeaders ?? this.httpHeaders,
       httpBody: httpBody ?? this.httpBody,
       wifiOnly: wifiOnly ?? this.wifiOnly,
+      uptime7Days: uptime7Days ?? this.uptime7Days,
+      uptime30Days: uptime30Days ?? this.uptime30Days,
     );
   }
 
@@ -126,6 +136,8 @@ class Watch {
       WatchFields.httpHeaders: httpHeaders,
       WatchFields.httpBody: httpBody,
       WatchFields.wifiOnly: wifiOnly ? 1 : 0,
+      WatchFields.uptime7Days: uptime7Days,
+      WatchFields.uptime30Days: uptime30Days,
     };
   }
 
@@ -151,6 +163,8 @@ class Watch {
       httpHeaders: map[WatchFields.httpHeaders] as String?,
       httpBody: map[WatchFields.httpBody] as String?,
       wifiOnly: map[WatchFields.wifiOnly] != null ? map[WatchFields.wifiOnly] == 1 : true,
+      uptime7Days: (map[WatchFields.uptime7Days] as num?)?.toDouble(),
+      uptime30Days: (map[WatchFields.uptime30Days] as num?)?.toDouble(),
     );
   }
 }

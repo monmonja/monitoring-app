@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../models/watch.dart';
 import '../models/domain.dart';
+import '../core/user_agent_helper.dart';
 
 class AddEditWatchScreen extends StatefulWidget {
   final Watch? watch;
@@ -33,6 +34,10 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
   late TextEditingController _httpBodyController;
   late TextEditingController _urlController;
 
+  List<UserAgentModel> _userAgents = [];
+  String? _selectedUserAgentValue;
+  bool _isLoadingUserAgents = true;
+
   @override
   void initState() {
     super.initState();
@@ -51,21 +56,61 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
     _urlController = TextEditingController(text: _url);
     _urlController.addListener(_autoSelectDomain);
 
+    _loadDomains();
+    _loadUserAgentsAndHeaders();
+  }
+
+  Future<void> _loadUserAgentsAndHeaders() async {
+    final agents = await UserAgentHelper.getUserAgents();
+    setState(() {
+      _userAgents = agents;
+      _isLoadingUserAgents = false;
+    });
+
     if (widget.watch?.httpHeaders != null) {
       try {
         final Map<String, dynamic> decodedHeaders = jsonDecode(widget.watch!.httpHeaders!);
+
+        // Extract User-Agent if it exists
+        String? existingUserAgent;
+        final keysToRemove = <String>[];
+
         decodedHeaders.forEach((key, value) {
-          _headers.add({
-            'key': TextEditingController(text: key),
-            'value': TextEditingController(text: value.toString()),
+          if (key.toLowerCase() == 'user-agent') {
+            existingUserAgent = value.toString();
+            keysToRemove.add(key);
+          }
+        });
+
+        for (var key in keysToRemove) {
+          decodedHeaders.remove(key);
+        }
+
+        if (existingUserAgent != null) {
+          // Check if this UA exists in our list, if not, add it temporarily
+          bool exists = _userAgents.any((ua) => ua.value == existingUserAgent);
+          if (!exists) {
+            setState(() {
+              _userAgents.insert(0, UserAgentModel(name: 'Custom (From DB)', value: existingUserAgent!));
+            });
+          }
+          setState(() {
+            _selectedUserAgentValue = existingUserAgent;
+          });
+        }
+
+        decodedHeaders.forEach((key, value) {
+          setState(() {
+            _headers.add({
+              'key': TextEditingController(text: key),
+              'value': TextEditingController(text: value.toString()),
+            });
           });
         });
       } catch (e) {
         // ignore errors
       }
     }
-
-    _loadDomains();
   }
 
   @override
@@ -145,9 +190,13 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
     for (var header in _headers) {
       final key = header['key']!.text.trim();
       final value = header['value']!.text.trim();
-      if (key.isNotEmpty) {
+      if (key.isNotEmpty && key.toLowerCase() != 'user-agent') {
         headersMap[key] = value;
       }
+    }
+
+    if (_selectedUserAgentValue != null && _selectedUserAgentValue!.isNotEmpty) {
+      headersMap['User-Agent'] = _selectedUserAgentValue!;
     }
 
     String? headersJson = headersMap.isNotEmpty ? jsonEncode(headersMap) : null;
@@ -285,6 +334,32 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 16),
+                        if (!_isLoadingUserAgents) ...[
+                          const SizedBox(height: 16),
+                          DropdownButtonFormField<String>(
+                            decoration: const InputDecoration(labelText: 'User Agent (Optional)'),
+                            value: _selectedUserAgentValue,
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('Default / None'),
+                              ),
+                              ..._userAgents.map((agent) {
+                                return DropdownMenuItem<String>(
+                                  value: agent.value,
+                                  child: Text(agent.name, overflow: TextOverflow.ellipsis),
+                                );
+                              }),
+                            ],
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedUserAgentValue = value;
+                              });
+                            },
+                          ),
+                        ],
                         const SizedBox(height: 16),
                         const Text('Custom Headers', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         const SizedBox(height: 8),
