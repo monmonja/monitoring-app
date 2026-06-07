@@ -59,6 +59,10 @@ void onStart(ServiceInstance service) async {
 
   final battery = Battery();
 
+  // In-memory tracking of when we last logged a "Skipped" message for a watch
+  // This prevents database spam while still allowing us to check Wi-Fi status every minute
+  final Map<int, DateTime> lastSkippedLogTime = {};
+
   // Run the check loop periodically
   Timer.periodic(const Duration(minutes: 1), (timer) async {
     try {
@@ -67,15 +71,29 @@ void onStart(ServiceInstance service) async {
       // Get device states
       final prefs = await SharedPreferences.getInstance();
       final batteryMultiplier = prefs.getDouble('battery_multiplier') ?? 1.0;
-      final batteryLevel = await battery.batteryLevel;
-      final isBatterySaverOn = await battery.isInBatterySaveMode;
 
-      final connectivityResult = await Connectivity().checkConnectivity();
-      final connectivitySaysWifi =
-          connectivityResult.contains(ConnectivityResult.wifi);
-      final isWifi = connectivitySaysWifi
-          ? await ConnectivityHelper.isOnWifi()
-          : false;
+      int batteryLevel = 100;
+      bool isBatterySaverOn = false;
+      try {
+        batteryLevel = await battery.batteryLevel;
+        isBatterySaverOn = await battery.isInBatterySaveMode;
+      } catch (e) {
+        developer.log("Error getting battery state: $e");
+      }
+
+      bool isWifi = false;
+      try {
+        final connectivityResult = await Connectivity().checkConnectivity();
+        final connectivitySaysWifi =
+            connectivityResult.contains(ConnectivityResult.wifi);
+        isWifi = connectivitySaysWifi
+            ? await ConnectivityHelper.isOnWifi()
+            : false;
+      } catch (e) {
+        developer.log("Error getting connectivity state: $e");
+        // Default to true if connectivity check fails, so we at least attempt checks
+        isWifi = true;
+      }
 
       // Apply power policy: multiply interval if battery is low or in power save mode
       bool applyPowerPolicy = batteryLevel < 20 || isBatterySaverOn;
@@ -85,31 +103,49 @@ void onStart(ServiceInstance service) async {
       for (final watch in watches) {
         if (!watch.isActive) continue;
 
-        // Check if interval has passed
         final now = DateTime.now();
+        final effectiveInterval = applyPowerPolicy ? (watch.intervalMinutes * batteryMultiplier).ceil() : watch.intervalMinutes;
+
+        // Check if interval has passed
+        bool intervalPassed = true;
         if (watch.lastCheckTime != null) {
           final difference = now.difference(watch.lastCheckTime!);
-          final effectiveInterval = applyPowerPolicy ? (watch.intervalMinutes * batteryMultiplier).ceil() : watch.intervalMinutes;
-
           if (difference.inMinutes < effectiveInterval) {
-            continue;
+            intervalPassed = false;
           }
         }
 
         if (watch.wifiOnly && !isWifi) {
-          // Log skipped check due to wifi policy
-          if (watch.id != null) {
-            await dbHelper.createWatchLog(WatchLog(
-              watchId: watch.id!,
-              timestamp: now,
-              status: false,
-              statusCode: 0,
-              errorMessage: 'Skipped: Not on Wi-Fi',
-              responseTimeMs: null,
-            ));
+          if (!intervalPassed) {
+            continue;
           }
-          // Update last check time without incrementing fails or alerting
-          await dbHelper.update(watch.copyWith(lastCheckTime: now));
+
+          // Log skipped check only if we haven't logged one recently to prevent log spam
+          // We don't update lastCheckTime so that as soon as Wi-Fi reconnects, it checks.
+          if (watch.id != null) {
+            bool recentlySkipped = false;
+            final lastSkipped = lastSkippedLogTime[watch.id!];
+            if (lastSkipped != null && now.difference(lastSkipped).inHours < 1) {
+              recentlySkipped = true;
+            }
+
+            if (!recentlySkipped) {
+              await dbHelper.createWatchLog(WatchLog(
+                watchId: watch.id!,
+                timestamp: now,
+                status: false,
+                statusCode: 0,
+                errorMessage: 'Skipped: Not on Wi-Fi',
+                responseTimeMs: null,
+              ));
+              lastSkippedLogTime[watch.id!] = now;
+            }
+          }
+          continue; // Skip without updating lastCheckTime
+        }
+
+        // If not skipped, and interval hasn't passed, then continue
+        if (!intervalPassed) {
           continue;
         }
 
