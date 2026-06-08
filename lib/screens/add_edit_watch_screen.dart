@@ -339,7 +339,7 @@ class _AddEditWatchScreenState extends State<AddEditWatchScreen> {
                           const SizedBox(height: 16),
                           DropdownButtonFormField<String>(
                             decoration: const InputDecoration(labelText: 'User Agent (Optional)'),
-                            value: _selectedUserAgentValue,
+                            initialValue: _selectedUserAgentValue,
                             isExpanded: true,
                             items: [
                               const DropdownMenuItem<String>(
